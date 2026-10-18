@@ -47,4 +47,22 @@ body.chaos-mode footer a{color:#160710}
 .section:hover{transform:translateY(-3px);transition:transform .25s ease,box-shadow .25s ease;box-shadow:0 28px 70px rgba(0,0,0,.34)}
 body.chaos-mode .section{border:3px solid #160710;background:linear-gradient(145deg,#ffbf24ee,#e86b0bee);box-shadow:10px 12px 0 #160710}
 body.chaos-mode .section:before{background:#160710}
+
+.header-clock{display:flex;align-items:center;gap:9px;margin-left:auto;margin-right:18px;color:#f7f7fb}
+.clock-face{position:relative;width:42px;height:42px;border:2px solid #a78bfa;border-radius:50%;background:#17152d;box-shadow:0 0 18px #a78bfa88}
+.clock-face:before{content:'';position:absolute;left:50%;top:50%;width:6px;height:6px;border-radius:50%;background:#f472b6;transform:translate(-50%,-50%);z-index:4}
+.clock-hand{position:absolute;left:50%;bottom:50%;width:2px;border-radius:3px;transform-origin:50% 100%;transform:translateX(-50%)}
+.clock-hour{height:12px;background:#fff;animation:clock-hour 43200s linear infinite}
+.clock-minute{height:17px;background:#a78bfa;animation:clock-minute 3600s linear infinite}
+.clock-second{height:19px;background:#f472b6;animation:clock-second 60s steps(60,end) infinite}
+#clockDigital{font-size:12px;font-variant-numeric:tabular-nums}
+@keyframes clock-hour{to{transform:translateX(-50%) rotate(360deg)}}
+@keyframes clock-minute{to{transform:translateX(-50%) rotate(360deg)}}
+@keyframes clock-second{to{transform:translateX(-50%) rotate(360deg)}}
+@media(max-width:680px){.header-clock{margin-right:8px}#clockDigital{display:none}.clock-face{width:34px;height:34px}}
 body.chaos-mode .section:nth-of-type(2),body.chaos-mode .section:nth-of-type(3),body.chaos-mode .section:nth-of-type(4),body.chaos-mode .section:nth-of-type(5){background:linear-gradient(145deg,#ffbf24ee,#e86b0bee)}
+ 
+.clock-face{display:none}
+.header-clock{gap:0;margin-left:auto;margin-right:18px}
+#clockDigital{display:inline-block;padding:7px 10px;border:1px solid #a78bfa;border-radius:999px;background:#17152d;color:#fff;font-size:13px;font-weight:800;letter-spacing:.04em;box-shadow:0 0 16px #a78bfa66}
+@media(max-width:680px){.header-clock{margin-right:8px}#clockDigital{font-size:11px;padding:6px 8px}}
