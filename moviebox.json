@@ -1,0 +1,24 @@
+{
+  "userId": 1,
+  "id": 1,
+  "title": "MovieBox — кіно, яке обирають глядачі",
+  "body": "Переїзний кінозал у переобладнаному контейнері. Відвідувачі голосують за фільм, а після визначення переможця бронюють місця онлайн.",
+  "cinema": {
+    "name": "MovieBox",
+    "capacity": 9,
+    "mobile": true,
+    "soundproof": true
+  },
+  "voting": {
+    "enabled": true,
+    "rule": "Показуємо фільм, який набрав найбільше голосів"
+  },
+  "booking": {
+    "online": true,
+    "seatSelection": true
+  },
+  "ai": {
+    "enabled": true,
+    "purpose": "Рекомендація фільмів для голосування"
+  }
+}
