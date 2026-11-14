@@ -7,10 +7,39 @@
   const VERSION = 2;
   const DEFAULT_CATEGORIES = [
     { id: 'food', name: 'Їжа', type: 'expense', parentId: null },
+    { id: 'groceries', name: 'Продукти', type: 'expense', parentId: 'food' },
+    { id: 'cafe', name: 'Кафе й ресторани', type: 'expense', parentId: 'food' },
     { id: 'transport', name: 'Транспорт', type: 'expense', parentId: null },
+    { id: 'fuel', name: 'Пальне', type: 'expense', parentId: 'transport' },
+    { id: 'taxi', name: 'Таксі', type: 'expense', parentId: 'transport' },
+    { id: 'public-transport', name: 'Громадський транспорт', type: 'expense', parentId: 'transport' },
     { id: 'shopping', name: 'Покупки', type: 'expense', parentId: null },
+    { id: 'clothes', name: 'Одяг і взуття', type: 'expense', parentId: 'shopping' },
+    { id: 'home-goods', name: 'Дім і побут', type: 'expense', parentId: 'shopping' },
+    { id: 'health', name: 'Здоров’я', type: 'expense', parentId: null },
+    { id: 'pharmacy', name: 'Аптека', type: 'expense', parentId: 'health' },
+    { id: 'doctor', name: 'Лікарі та аналізи', type: 'expense', parentId: 'health' },
+    { id: 'entertainment', name: 'Розваги', type: 'expense', parentId: null },
+    { id: 'cinema', name: 'Кіно', type: 'expense', parentId: 'entertainment' },
+    { id: 'hobbies', name: 'Хобі', type: 'expense', parentId: 'entertainment' },
+    { id: 'utilities', name: 'Комунальні послуги', type: 'expense', parentId: null },
+    { id: 'rent', name: 'Оренда житла', type: 'expense', parentId: null },
+    { id: 'subscriptions', name: 'Підписки та сервіси', type: 'expense', parentId: null },
+    { id: 'education', name: 'Освіта', type: 'expense', parentId: null },
+    { id: 'travel', name: 'Подорожі', type: 'expense', parentId: null },
+    { id: 'gifts', name: 'Подарунки', type: 'expense', parentId: null },
+    { id: 'pets', name: 'Домашні тварини', type: 'expense', parentId: null },
+    { id: 'beauty', name: 'Краса та догляд', type: 'expense', parentId: null },
+    { id: 'sports', name: 'Спорт', type: 'expense', parentId: null },
+    { id: 'insurance', name: 'Страхування', type: 'expense', parentId: null },
     { id: 'other', name: 'Інше', type: 'expense', parentId: null },
     { id: 'income', name: 'Дохід', type: 'income', parentId: null }
+  ];
+  const PAYMENT_METHODS = [
+    { id:'cash', name:'Готівка' }, { id:'card', name:'Картка' },
+    { id:'bank_transfer', name:'Банківський переказ' }, { id:'mobile_pay', name:'Телефон або годинник' },
+    { id:'online', name:'Онлайн-оплата' }, { id:'ewallet', name:'Електронний гаманець' },
+    { id:'other', name:'Інше' }
   ];
 
   function emptyState() {
@@ -19,8 +48,20 @@
       accounts: [{ id: 'cash', name: 'Готівка', openingKopecks: 0, archived: false }],
       categories: DEFAULT_CATEGORIES.map(item => ({ ...item })),
       transactions: [], budgets: [], goals: [], schedules: [], rules: [],
-      settings: { currency: 'UAH', theme: 'light' }
+      settings: { currency: 'UAH', theme: 'light', categoryCatalogVersion: 2 }
     };
+  }
+
+  function upgradeStarterCategories(state) {
+    const next=structuredClone(state);
+    if ((next.settings.categoryCatalogVersion||0)>=2) return next;
+    const ids=new Set(next.categories.map(c=>c.id));
+    for (const category of DEFAULT_CATEGORIES) if (!ids.has(category.id)) {
+      const parent=category.parentId && next.categories.find(c=>c.id===category.parentId);
+      next.categories.push({...category,parentId:parent?.type===category.type?category.parentId:null});
+    }
+    next.settings.categoryCatalogVersion=2;
+    return next;
   }
 
   function parseMoney(raw) {
@@ -64,18 +105,18 @@
   }
 
   const SAMPLE_EXPENSES = [
-    ['Заправка авто',165000,'transport',0],
-    ['Кафе',28500,'food',1],
-    ['Продукти в магазині',124580,'food',2],
-    ['Аптека',36840,'other',3],
-    ['Кіно',44000,'other',4],
-    ['Проїзд автобусом',8600,'transport',5],
-    ['Обід у кафе',34500,'food',6],
-    ['Побутові товари',61890,'shopping',8],
-    ['Кава з собою',10500,'food',10],
-    ['Таксі',24500,'transport',12],
-    ['Одяг',179900,'shopping',15],
-    ['Музична підписка',12900,'other',20]
+    ['Заправка авто',165000,'fuel',0,'card'],
+    ['Кафе',28500,'cafe',1,'card'],
+    ['Продукти в магазині',124580,'groceries',2,'card'],
+    ['Аптека',36840,'pharmacy',3,'mobile_pay'],
+    ['Кіно',44000,'cinema',4,'online'],
+    ['Проїзд автобусом',8600,'public-transport',5,'cash'],
+    ['Обід у кафе',34500,'cafe',6,'cash'],
+    ['Побутові товари',61890,'home-goods',8,'card'],
+    ['Кава з собою',10500,'cafe',10,'cash'],
+    ['Таксі',24500,'taxi',12,'online'],
+    ['Одяг',179900,'clothes',15,'card'],
+    ['Музична підписка',12900,'subscriptions',20,'online']
   ];
 
   function addSampleExpenses(state, baseDate) {
@@ -86,16 +127,23 @@
     if (!next.categories.some(c=>c.type==='expense')) next.categories.push({id:'demo-other',name:'Інше',type:'expense',parentId:null});
     const fallback=next.categories.find(c=>c.type==='expense');
     let added=0;
-    SAMPLE_EXPENSES.forEach(([title,amountKopecks,categoryId,daysAgo],index)=>{
+    SAMPLE_EXPENSES.forEach(([title,amountKopecks,categoryId,daysAgo,paymentMethod],index)=>{
       const sampleId=`sample-expense-${String(index+1).padStart(2,'0')}`;
       if (next.transactions.some(t=>t.id===sampleId)) return;
       const day=new Date(`${baseDate}T12:00:00Z`);
       day.setUTCDate(day.getUTCDate()-daysAgo);
       const category=next.categories.find(c=>c.id===categoryId && c.type==='expense') || fallback;
-      next.transactions.push({id:sampleId,title,type:'expense',amountKopecks,accountId:account.id,toAccountId:null,categoryId:category.id,date:day.toISOString().slice(0,10),note:'Приклад витрати',tags:['приклад']});
+      next.transactions.push({id:sampleId,title,type:'expense',amountKopecks,accountId:account.id,toAccountId:null,categoryId:category.id,paymentMethod,date:day.toISOString().slice(0,10),note:'Приклад витрати',tags:['приклад']});
       added++;
     });
     return {state:next,added};
+  }
+
+  function ensureSampleExpensesOnce(state, baseDate) {
+    if ((state.settings.sampleExpensesVersion||0)>=1) return {state:structuredClone(state),added:0};
+    const result=addSampleExpenses(state,baseDate);
+    result.state.settings.sampleExpensesVersion=1;
+    return result;
   }
 
   function validateBackup(raw) {
@@ -108,9 +156,11 @@
     if (!raw.accounts.length || raw.accounts.some(a => typeof a.name !== 'string' || !a.name.trim() || !Number.isSafeInteger(a.openingKopecks) || a.openingKopecks < 0)) throw new Error('Некоректні рахунки.');
     if (raw.categories.some(c => typeof c.name !== 'string' || !c.name.trim() || !['expense','income'].includes(c.type) || (c.parentId && !raw.categories.some(p => p.id === c.parentId && p.type === c.type)))) throw new Error('Некоректні категорії.');
     if (raw.transactions.some(t => !['income','expense','transfer'].includes(t.type) || !Number.isSafeInteger(t.amountKopecks) || t.amountKopecks <= 0 || !validDate(t.date) || typeof t.title !== 'string' || !t.title.trim() || !raw.accounts.some(a => a.id === t.accountId) || (t.type === 'transfer' ? !raw.accounts.some(a => a.id === t.toAccountId && a.id !== t.accountId) : !raw.categories.some(c => c.id === t.categoryId && c.type === t.type)) || !Array.isArray(t.tags))) throw new Error('Некоректні транзакції.');
+    if (raw.transactions.some(t => t.paymentMethod != null && !PAYMENT_METHODS.some(m => m.id === t.paymentMethod))) throw new Error('Некоректний спосіб оплати у транзакції.');
     if (raw.budgets.some(b => !Number.isSafeInteger(b.limitKopecks) || b.limitKopecks <= 0 || !validDate(b.start) || !validDate(b.end) || b.start > b.end || (b.categoryId && !raw.categories.some(c => c.id === b.categoryId)))) throw new Error('Некоректні бюджети.');
     if (raw.goals.some(g => typeof g.name !== 'string' || !g.name.trim() || !Number.isSafeInteger(g.targetKopecks) || g.targetKopecks <= 0 || !Number.isSafeInteger(g.currentKopecks) || g.currentKopecks < 0)) throw new Error('Некоректні цілі.');
     if (raw.schedules.some(s => !['income','expense'].includes(s.type) || !['daily','weekly','monthly'].includes(s.recurrence) || !validDate(s.nextDate) || !Number.isSafeInteger(s.amountKopecks) || s.amountKopecks <= 0 || !raw.accounts.some(a => a.id === s.accountId) || !raw.categories.some(c => c.id === s.categoryId && c.type === s.type))) throw new Error('Некоректні заплановані операції.');
+    if (raw.schedules.some(s => s.paymentMethod != null && !PAYMENT_METHODS.some(m => m.id === s.paymentMethod))) throw new Error('Некоректний спосіб розрахунку у запланованій операції.');
     if (raw.rules.some(r => typeof r.needle !== 'string' || !r.needle.trim() || !raw.categories.some(c => c.id === r.categoryId))) throw new Error('Некоректні правила.');
     return structuredClone(raw);
   }
@@ -138,18 +188,27 @@
     return totals;
   }
 
-  function filterTransactions(rows, filters = {}) {
+  function filterTransactions(rows, filters = {}, categories = []) {
     const query = String(filters.query || '').trim().toLocaleLowerCase('uk');
     const tag = String(filters.tag || '').trim().toLocaleLowerCase('uk');
     return rows.filter(t => (!query || `${t.title} ${t.note || ''}`.toLocaleLowerCase('uk').includes(query)) &&
       (!filters.type || t.type === filters.type) && (!filters.accountId || t.accountId === filters.accountId || t.toAccountId === filters.accountId) &&
-      (!filters.categoryId || t.categoryId === filters.categoryId) && (!filters.start || t.date >= filters.start) && (!filters.end || t.date <= filters.end) &&
+      (!filters.categoryId || isCategoryWithin(t.categoryId,filters.categoryId,categories)) && (!filters.paymentMethod || (filters.paymentMethod === 'unspecified' ? !t.paymentMethod : t.paymentMethod === filters.paymentMethod)) && (!filters.start || t.date >= filters.start) && (!filters.end || t.date <= filters.end) &&
       (!filters.minKopecks || t.amountKopecks >= filters.minKopecks) && (!filters.maxKopecks || t.amountKopecks <= filters.maxKopecks) &&
       (!tag || (t.tags || []).some(value => value.toLocaleLowerCase('uk').includes(tag))));
   }
 
-  function budgetSpent(budget, rows) {
-    return rows.reduce((sum, t) => sum + (t.type === 'expense' && t.date >= budget.start && t.date <= budget.end && (!budget.categoryId || t.categoryId === budget.categoryId) ? t.amountKopecks : 0), 0);
+  function isCategoryWithin(categoryId, parentId, categories) {
+    let current=categoryId; const seen=new Set();
+    while(current && !seen.has(current)) {
+      if(current===parentId) return true;
+      seen.add(current);
+      current=categories.find(c=>c.id===current)?.parentId;
+    }
+    return false;
+  }
+  function budgetSpent(budget, rows, categories=[]) {
+    return rows.reduce((sum, t) => sum + (t.type === 'expense' && t.date >= budget.start && t.date <= budget.end && (!budget.categoryId || isCategoryWithin(t.categoryId,budget.categoryId,categories)) ? t.amountKopecks : 0), 0);
   }
 
   function advanceDate(date, recurrence, anchorDay) {
@@ -191,12 +250,13 @@
       const title=get('title'),amountKopecks=parseMoney(get('amount')),date=get('date');
       const rawType=get('type').toLocaleLowerCase('uk');
       const type=rawType==='дохід'||rawType==='income'?'income':rawType==='переказ'||rawType==='transfer'?'transfer':rawType===''||rawType==='витрата'||rawType==='expense'?'expense':null;
-      const accountRaw=get('account'),categoryRaw=get('category'),destinationRaw=get('destination');
+      const accountRaw=get('account'),categoryRaw=get('category'),destinationRaw=get('destination'),paymentRaw=get('paymentMethod').toLocaleLowerCase('uk');
       const account=accountRaw?state.accounts.find(a=>a.name.toLocaleLowerCase('uk')===accountRaw.toLocaleLowerCase('uk')):state.accounts.find(a=>!a.archived);
       const destination=type==='transfer'?state.accounts.find(a=>a.name.toLocaleLowerCase('uk')===destinationRaw.toLocaleLowerCase('uk')):null;
       const category=type&&type!=='transfer'?(categoryRaw?state.categories.find(c=>c.type===type&&c.name.toLocaleLowerCase('uk')===categoryRaw.toLocaleLowerCase('uk')):state.categories.find(c=>c.type===type)):null;
-      if(!title||!amountKopecks||!validDate(date)||!type||!account||(type==='transfer'?(!destination||destination.id===account.id):!category)){problems.push(index+2);return;}
-      const item={title,type,amountKopecks,date,accountId:account.id,toAccountId:destination?.id||null,categoryId:category?.id||null,note:get('note'),tags:get('tags').split(/[;,]/).map(s=>s.trim()).filter(Boolean)};
+      const paymentMethod=paymentRaw ? PAYMENT_METHODS.find(m=>m.id===paymentRaw||m.name.toLocaleLowerCase('uk')===paymentRaw)?.id : null;
+      if(!title||!amountKopecks||!validDate(date)||!type||!account||(type==='transfer'?(!destination||destination.id===account.id):!category)||(paymentRaw&&!paymentMethod)){problems.push(index+2);return;}
+      const item={title,type,amountKopecks,date,accountId:account.id,toAccountId:destination?.id||null,categoryId:category?.id||null,paymentMethod,note:get('note'),tags:get('tags').split(/[;,]/).map(s=>s.trim()).filter(Boolean)};
       const fingerprint=transactionFingerprint(item);
       if(existing.has(fingerprint)){problems.push(index+2);return;}
       existing.add(fingerprint);pending.push(item);
@@ -206,7 +266,7 @@
   function csvCell(value) { let s=String(value??''); if (/^[\s]*[=+\-@]/.test(s)) s=`'${s}`; return /[",\n\r;]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s; }
   function toCSV(rows) { return rows.map(row=>row.map(csvCell).join(',')).join('\r\n')+'\r\n'; }
 
-  return { VERSION, DEFAULT_CATEGORIES, emptyState, parseMoney, parseNonnegativeMoney, validDate, migrateLegacy, addSampleExpenses, validateBackup,
-    accountBalance, periodTotals, filterTransactions, budgetSpent, advanceDate, parseCSV, transactionFingerprint, mapCsvTransactions, toCSV };
+  return { VERSION, DEFAULT_CATEGORIES, PAYMENT_METHODS, emptyState, upgradeStarterCategories, parseMoney, parseNonnegativeMoney, validDate, migrateLegacy, addSampleExpenses, ensureSampleExpensesOnce, validateBackup,
+    accountBalance, periodTotals, filterTransactions, isCategoryWithin, budgetSpent, advanceDate, parseCSV, transactionFingerprint, mapCsvTransactions, toCSV };
 });
 
