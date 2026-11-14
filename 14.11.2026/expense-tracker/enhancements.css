@@ -2,3 +2,6 @@
 
 #categories-list{max-height:460px;overflow:auto;padding-right:6px}#transaction-payment{max-width:100%}
 
+.site-header nav a[aria-current=page]{color:var(--teal-dark);background:var(--mint);padding:8px 11px;border-radius:8px}.site-header nav a{padding:8px 2px}.breadcrumb{margin:0 0 18px;color:var(--muted);font-size:.9rem}.breadcrumb a{color:var(--teal-dark);font-weight:700}.category-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.category-metrics h2{font-size:1rem;margin:0 0 15px}.category-metrics .total-panel{min-height:0}.expense-details>a,.chart-item a,.management-row a{color:var(--teal-dark);font-weight:700;text-underline-offset:3px}.expense-details>a{font-size:.83rem}.category-metrics .metric-card{min-width:0}@media(max-width:760px){.category-metrics{grid-template-columns:1fr 1fr}.site-header nav{width:100%;justify-content:flex-start;gap:7px}}@media(max-width:520px){.category-metrics{grid-template-columns:1fr}.site-header nav a{font-size:.83rem;padding:7px 9px}}
+html[data-theme=dark] .site-header nav a[aria-current=page]{color:var(--ink)}
+
