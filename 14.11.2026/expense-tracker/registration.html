@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#123a43">
+  <title>Реєстрація — Мої фінанси</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="enhancements.css">
+  <script src="finance.js" defer></script>
+  <script src="script.js" defer></script>
+</head>
+<body data-page="registration">
+  <header class="site-header"><div class="shell header-inner"><a class="brand" href="index.html">Мої фінанси<span class="brand-mark" aria-hidden="true">●</span></a><nav aria-label="Розділи"><a href="index.html">Огляд</a><a href="transactions.html">Операції</a><a href="planning.html">Планування</a><a href="management.html">Рахунки й категорії</a><a href="data.html">Дані</a><a href="registration.html" aria-current="page">Реєстрація</a></nav></div></header>
+  <main class="shell"><p id="app-message" class="notice" role="status" hidden></p>
+<section id="registration" class="registration"><div class="section-heading"><div><p class="section-kicker">Навчальний приклад</p><h2>Форма реєстрації</h2><p class="section-description">Ця форма перевіряє введені дані, але не створює облікового запису.</p></div></div><div class="registration-layout"><form id="registration-form" class="panel registration-form" novalidate><div class="field"><label for="username">Ім’я користувача</label><input id="username" name="username" autocomplete="username" aria-describedby="username-error"><p id="username-error" class="field-error" aria-live="polite"></p></div><div class="field"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" aria-describedby="email-error"><p id="email-error" class="field-error" aria-live="polite"></p></div><div class="form-row"><div class="field"><label for="password">Пароль</label><input id="password" name="password" type="password" autocomplete="new-password" aria-describedby="password-error"><p id="password-error" class="field-error" aria-live="polite"></p></div><div class="field"><label for="confirmation">Підтвердження пароля</label><input id="confirmation" name="confirmation" type="password" autocomplete="new-password" aria-describedby="confirmation-error"><p id="confirmation-error" class="field-error" aria-live="polite"></p></div></div><div class="terms-field"><label class="checkbox-label" for="terms"><input id="terms" name="terms" type="checkbox" aria-describedby="terms-error"> Погоджуюсь з умовами</label><p id="terms-error" class="field-error" aria-live="polite"></p></div><button class="primary-button" type="submit">Зареєструватися</button><p id="registration-success" class="success-message" role="status" hidden>Реєстрація успішна!</p></form><div class="registration-note"><span class="note-symbol" aria-hidden="true">✓</span><h3>Демонстраційна форма</h3><p>Дані реєстрації та паролі не зберігаються і нікуди не надсилаються.</p></div></div></section></main>
+  <footer class="site-footer"><div class="shell">Локальний навчальний застосунок · Твої дані у твоєму браузері</div></footer>
+</body>
+</html>
+
