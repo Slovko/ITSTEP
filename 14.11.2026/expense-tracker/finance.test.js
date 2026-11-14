@@ -89,3 +89,15 @@ test('CSV import preserves transfers between named accounts', () => {
   assert.deepEqual(result.problems,[]);
 });
 
+test('twelve sample expenses have realistic amounts and are added only once', () => {
+  const state=F.emptyState();
+  const first=F.addSampleExpenses(state,'2026-11-14');
+  assert.equal(first.added,12);
+  assert.equal(first.state.transactions.length,12);
+  assert(first.state.transactions.every(t=>t.type==='expense' && t.amountKopecks>0 && t.accountId==='cash'));
+  assert(first.state.transactions.some(t=>t.title==='Заправка авто'));
+  assert(first.state.transactions.some(t=>t.title==='Кіно'));
+  assert.equal(F.addSampleExpenses(first.state,'2026-11-14').added,0);
+  assert.equal(state.transactions.length,0);
+});
+
