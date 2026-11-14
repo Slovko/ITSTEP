@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#102d36">
+  <title>Мої витрати — трекер витрат і форма реєстрації</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="shell header-inner">
+      <a class="brand" href="#top" aria-label="Мої витрати — на початок">Мої витрати<span class="brand-mark" aria-hidden="true">●</span></a>
+      <nav aria-label="Основна навігація"><a href="#tracker">Трекер витрат</a><a href="#registration">Реєстрація</a></nav>
+    </div>
+  </header>
+
+  <main id="top" class="shell">
+    <section class="intro" aria-labelledby="page-title">
+      <div>
+        <p class="intro-kicker">Щоденний облік</p>
+        <h1 id="page-title">Витрати під контролем.</h1>
+        <p class="intro-copy">Записуйте покупки, знаходьте потрібне й бачте, куди йдуть гроші. Усі записи залишаються в цьому браузері.</p>
+      </div>
+      <div class="intro-symbol" aria-hidden="true"><span>₴</span></div>
+    </section>
+
+    <section id="tracker" class="tracker" aria-labelledby="tracker-title">
+      <div class="section-heading"><div><p class="section-kicker">Ваш бюджет</p><h2 id="tracker-title">Трекер витрат</h2></div></div>
+      <p id="storage-notice" class="notice" role="status" hidden>Браузер не дозволяє зберегти записи. Вони залишаться лише до перезавантаження сторінки.</p>
+      <div class="tracker-grid">
+        <div class="main-column">
+          <section class="panel add-panel" aria-labelledby="add-title">
+            <h3 id="add-title">Нова витрата</h3>
+            <form id="expense-form" novalidate>
+              <div class="field"><label for="name">Назва витрати</label><input id="name" name="name" type="text" placeholder="Наприклад, кава" maxlength="120" autocomplete="off" aria-describedby="name-error"><p id="name-error" class="field-error" aria-live="polite"></p></div>
+              <div class="form-row">
+                <div class="field"><label for="amount">Сума, ₴</label><input id="amount" name="amount" type="text" inputmode="decimal" placeholder="0,00" aria-describedby="amount-error"><p id="amount-error" class="field-error" aria-live="polite"></p></div>
+                <div class="field"><label for="category">Категорія</label><select id="category" name="category" aria-describedby="category-error"><option value="">Оберіть категорію</option><option>Їжа</option><option>Транспорт</option><option>Покупки</option><option>Інше</option></select><p id="category-error" class="field-error" aria-live="polite"></p></div>
+              </div>
+              <button class="primary-button" type="submit">Додати витрату</button>
+            </form>
+          </section>
+
+          <section class="panel list-panel" aria-labelledby="list-title">
+            <div class="list-heading"><h3 id="list-title">Історія витрат</h3><span id="result-count" class="result-count">Знайдено: 0</span></div>
+            <div class="form-row filter-row">
+              <div class="field"><label for="expense-search">Пошук за назвою</label><input id="expense-search" type="search" placeholder="Почніть вводити назву"></div>
+              <div class="field"><label for="category-filter">Фільтр за категорією</label><select id="category-filter"><option>Усі категорії</option><option>Їжа</option><option>Транспорт</option><option>Покупки</option><option>Інше</option></select></div>
+            </div>
+            <p id="empty-state" class="empty-state">Поки немає витрат. Додайте першу у формі.</p>
+            <ul id="expense-list" class="expense-list" aria-label="Список витрат"></ul>
+            <button id="clear-all" class="text-button danger" type="button" disabled>Очистити всі витрати</button>
+          </section>
+        </div>
+
+        <aside class="summary-column" aria-label="Статистика витрат">
+          <section class="total-panel" aria-labelledby="total-title"><h3 id="total-title">Витрачено всього</h3><p id="total-amount" class="total-amount">0,00 ₴</p><p>Підсумок усіх доданих витрат</p></section>
+          <section class="panel categories-panel" aria-labelledby="categories-title"><h3 id="categories-title">За категоріями</h3><div id="category-totals" class="category-totals"></div></section>
+        </aside>
+      </div>
+    </section>
+
+    <section id="registration" class="registration" aria-labelledby="registration-title">
+      <div class="section-heading"><div><p class="section-kicker">Навчальний приклад</p><h2 id="registration-title">Форма реєстрації</h2><p class="section-description">Перевірка полів працює прямо на сторінці. Обліковий запис не створюється.</p></div></div>
+      <div class="registration-layout">
+        <form id="registration-form" class="panel registration-form" novalidate>
+          <div class="field"><label for="username">Ім’я користувача</label><input id="username" name="username" type="text" autocomplete="username" aria-describedby="username-error"><p id="username-error" class="field-error" aria-live="polite"></p></div>
+          <div class="field"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" aria-describedby="email-error"><p id="email-error" class="field-error" aria-live="polite"></p></div>
+          <div class="form-row"><div class="field"><label for="password">Пароль</label><input id="password" name="password" type="password" autocomplete="new-password" aria-describedby="password-error"><p id="password-error" class="field-error" aria-live="polite"></p></div><div class="field"><label for="confirmation">Підтвердження пароля</label><input id="confirmation" name="confirmation" type="password" autocomplete="new-password" aria-describedby="confirmation-error"><p id="confirmation-error" class="field-error" aria-live="polite"></p></div></div>
+          <div class="terms-field"><label class="checkbox-label" for="terms"><input id="terms" name="terms" type="checkbox" aria-describedby="terms-error"><span>Погоджуюсь з умовами</span></label><p id="terms-error" class="field-error" aria-live="polite"></p></div>
+          <button class="primary-button" type="submit">Зареєструватися</button>
+          <p id="registration-success" class="success-message" role="status" hidden>Реєстрація успішна!</p>
+        </form>
+        <div class="registration-note"><span class="note-symbol" aria-hidden="true">✓</span><h3>Безпечно для вправи</h3><p>Це демонстрація перевірки форми JavaScript. Дані реєстрації та паролі не зберігаються і нікуди не надсилаються.</p></div>
+      </div>
+    </section>
+  </main>
+  <footer class="site-footer"><div class="shell">Навчальний проєкт · HTML, CSS і JavaScript</div></footer>
+</body>
+</html>
+
