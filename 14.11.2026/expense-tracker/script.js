@@ -44,6 +44,7 @@ if (typeof module !== 'undefined') {
 }
 
 if (typeof document !== 'undefined') {
+  try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem('my-finances-v2'))?.settings?.theme === 'dark' ? 'dark' : 'light'; } catch { document.documentElement.dataset.theme = 'light'; }
   const form = document.querySelector('#registration-form');
   const fields = ['username','email','password','confirmation','terms'];
   const success = document.querySelector('#registration-success');
