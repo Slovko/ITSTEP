@@ -63,6 +63,41 @@
     return state;
   }
 
+  const SAMPLE_EXPENSES = [
+    ['Заправка авто',165000,'transport',0],
+    ['Кафе',28500,'food',1],
+    ['Продукти в магазині',124580,'food',2],
+    ['Аптека',36840,'other',3],
+    ['Кіно',44000,'other',4],
+    ['Проїзд автобусом',8600,'transport',5],
+    ['Обід у кафе',34500,'food',6],
+    ['Побутові товари',61890,'shopping',8],
+    ['Кава з собою',10500,'food',10],
+    ['Таксі',24500,'transport',12],
+    ['Одяг',179900,'shopping',15],
+    ['Музична підписка',12900,'other',20]
+  ];
+
+  function addSampleExpenses(state, baseDate) {
+    if (!validDate(baseDate)) throw new Error('Некоректна дата прикладів.');
+    const next=structuredClone(state);
+    const account=next.accounts.find(a=>!a.archived);
+    if (!account) return {state:next,added:0};
+    if (!next.categories.some(c=>c.type==='expense')) next.categories.push({id:'demo-other',name:'Інше',type:'expense',parentId:null});
+    const fallback=next.categories.find(c=>c.type==='expense');
+    let added=0;
+    SAMPLE_EXPENSES.forEach(([title,amountKopecks,categoryId,daysAgo],index)=>{
+      const sampleId=`sample-expense-${String(index+1).padStart(2,'0')}`;
+      if (next.transactions.some(t=>t.id===sampleId)) return;
+      const day=new Date(`${baseDate}T12:00:00Z`);
+      day.setUTCDate(day.getUTCDate()-daysAgo);
+      const category=next.categories.find(c=>c.id===categoryId && c.type==='expense') || fallback;
+      next.transactions.push({id:sampleId,title,type:'expense',amountKopecks,accountId:account.id,toAccountId:null,categoryId:category.id,date:day.toISOString().slice(0,10),note:'Приклад витрати',tags:['приклад']});
+      added++;
+    });
+    return {state:next,added};
+  }
+
   function validateBackup(raw) {
     if (!raw || typeof raw !== 'object' || raw.version !== VERSION) throw new Error('Непідтримувана версія резервної копії.');
     const names = ['accounts', 'categories', 'transactions', 'budgets', 'goals', 'schedules', 'rules'];
@@ -171,7 +206,7 @@
   function csvCell(value) { let s=String(value??''); if (/^[\s]*[=+\-@]/.test(s)) s=`'${s}`; return /[",\n\r;]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s; }
   function toCSV(rows) { return rows.map(row=>row.map(csvCell).join(',')).join('\r\n')+'\r\n'; }
 
-  return { VERSION, DEFAULT_CATEGORIES, emptyState, parseMoney, parseNonnegativeMoney, validDate, migrateLegacy, validateBackup,
+  return { VERSION, DEFAULT_CATEGORIES, emptyState, parseMoney, parseNonnegativeMoney, validDate, migrateLegacy, addSampleExpenses, validateBackup,
     accountBalance, periodTotals, filterTransactions, budgetSpent, advanceDate, parseCSV, transactionFingerprint, mapCsvTransactions, toCSV };
 });
 
