@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#123a43">
+  <title>Категорія — Мої фінанси</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="enhancements.css">
+  <script src="finance.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body data-page="category">
+  <header class="site-header"><div class="shell header-inner"><a class="brand" href="index.html">Мої фінанси<span class="brand-mark" aria-hidden="true">●</span></a><nav aria-label="Розділи"><a href="index.html">Огляд</a><a href="transactions.html">Операції</a><a href="planning.html">Планування</a><a href="management.html" aria-current="page">Рахунки й категорії</a><a href="data.html">Дані</a><a href="registration.html">Реєстрація</a></nav></div></header>
+  <main class="shell"><p id="app-message" class="notice" role="status" hidden></p>
+<section id="category-detail" class="app-section" aria-labelledby="category-title">
+  <p class="breadcrumb"><a href="management.html">Рахунки й категорії</a> / Категорія</p>
+  <div id="category-error" class="empty-state" hidden>Категорію не знайдено. <a href="management.html">Повернутися до категорій</a></div>
+  <div id="category-view">
+    <div class="section-heading"><div><p class="section-kicker">Деталі категорії</p><h1 id="category-title">Категорія</h1></div><div class="field compact-field"><label for="category-month">Місяць</label><input id="category-month" type="month"></div></div>
+    <div class="metric-grid category-metrics"><article class="total-panel"><h2>Витрачено за місяць</h2><p id="category-period-total" class="total-amount">0,00 ₴</p></article><article class="metric-card"><h2>За весь час</h2><p id="category-all-total">0,00 ₴</p></article><article class="metric-card"><h2>Операцій за місяць</h2><p id="category-count">0</p></article></div>
+    <div class="dashboard-grid"><article class="panel"><h2>Бюджети категорії</h2><div id="category-budgets"></div></article><article class="panel"><h2>Підкатегорії</h2><div id="category-children"></div></article></div>
+    <article class="panel records-panel"><div class="list-heading"><h2>Операції за місяць</h2><a href="transactions.html">Усі операції</a></div><p id="category-empty" class="empty-state" hidden>За цей місяць витрат у категорії немає.</p><ul id="category-transactions" class="expense-list"></ul></article>
+  </div>
+</section></main>
+  <footer class="site-footer"><div class="shell">Локальний навчальний застосунок · Твої дані у твоєму браузері</div></footer>
+</body>
+</html>
+
