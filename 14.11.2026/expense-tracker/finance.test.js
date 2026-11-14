@@ -38,6 +38,7 @@ test('combined filters narrow records without changing source', () => {
   ];
   assert.deepEqual(F.filterTransactions(rows,{query:'кав',categoryId:'food',minKopecks:900,tag:'ранок'}).map(x=>x.id),['1']);
   assert.equal(rows.length,2);
+  assert.deepEqual(F.filterTransactions([{id:'3',title:'Кава',type:'expense',categoryId:'cafe',accountId:'cash',amountKopecks:1000,date:'2026-11-12',tags:[]}],{categoryId:'food'},F.DEFAULT_CATEGORIES).map(t=>t.id),['3']);
 });
 
 test('budget spending uses its period and category', () => {
@@ -47,6 +48,8 @@ test('budget spending uses its period and category', () => {
     {type:'expense',amountKopecks:4000,categoryId:'food',date:'2026-10-11'}
   ];
   assert.equal(F.budgetSpent({categoryId:'food',start:'2026-11-01',end:'2026-11-30'},rows),3000);
+  const nested=[{type:'expense',amountKopecks:1500,categoryId:'cafe',date:'2026-11-12'}];
+  assert.equal(F.budgetSpent({categoryId:'food',start:'2026-11-01',end:'2026-11-30'},nested,F.DEFAULT_CATEGORIES),1500);
 });
 
 test('recurring dates advance without creating transactions', () => {
@@ -99,5 +102,50 @@ test('twelve sample expenses have realistic amounts and are added only once', ()
   assert(first.state.transactions.some(t=>t.title==='Кіно'));
   assert.equal(F.addSampleExpenses(first.state,'2026-11-14').added,0);
   assert.equal(state.transactions.length,0);
+});
+
+test('starter expense categories are broad and older data gains them once', () => {
+  const state=F.emptyState();
+  assert(F.DEFAULT_CATEGORIES.filter(c=>c.type==='expense').length>=20);
+  for(const name of ['Пальне','Кафе й ресторани','Продукти','Аптека','Кіно','Комунальні послуги']) {
+    assert(state.categories.some(c=>c.name===name && c.type==='expense'));
+  }
+  state.categories=state.categories.filter(c=>['food','transport','shopping','other','income'].includes(c.id));
+  state.settings.categoryCatalogVersion=1;
+  state.categories.push({id:'custom',name:'Моє',type:'expense',parentId:null});
+  const upgraded=F.upgradeStarterCategories(state);
+  assert(upgraded.categories.some(c=>c.id==='custom'));
+  assert.equal(F.upgradeStarterCategories(upgraded).categories.length,upgraded.categories.length);
+  assert.equal(state.categories.length,6);
+});
+
+test('payment methods support multiple choices and sample expenses use several', () => {
+  assert(F.PAYMENT_METHODS.some(m=>m.id==='cash'));
+  assert(F.PAYMENT_METHODS.some(m=>m.id==='card'));
+  assert(F.PAYMENT_METHODS.length>=6);
+  const samples=F.addSampleExpenses(F.emptyState(),'2026-11-14').state.transactions;
+  assert(new Set(samples.map(t=>t.paymentMethod)).size>=3);
+  const backup=F.emptyState();
+  backup.transactions.push({...samples[0],id:'one',paymentMethod:'card'});
+  assert.equal(F.validateBackup(backup).transactions[0].paymentMethod,'card');
+  backup.transactions[0].paymentMethod='invalid';
+  assert.throws(()=>F.validateBackup(backup),/спосіб/);
+});
+
+test('payment method filter and CSV import keep the selected method', () => {
+  const state=F.emptyState();
+  const rows=[['Назва','Сума','Дата','Спосіб оплати'],['Кава','25','2026-11-14','Картка']];
+  const result=F.mapCsvTransactions(rows,{title:'0',amount:'1',date:'2',type:'',account:'',category:'',paymentMethod:'3',note:'',tags:''},state);
+  assert.equal(result.pending[0].paymentMethod,'card');
+  assert.deepEqual(F.filterTransactions([{paymentMethod:'card',title:'Кава',tags:[]},{title:'Чай',tags:[]}],{paymentMethod:'card'}).map(t=>t.title),['Кава']);
+});
+
+test('sample expenses are initialized once and stay deleted after a reload', () => {
+  const initial=F.ensureSampleExpensesOnce(F.emptyState(),'2026-11-14');
+  assert.equal(initial.added,12);
+  initial.state.transactions.shift();
+  const reloaded=F.ensureSampleExpensesOnce(initial.state,'2026-11-15');
+  assert.equal(reloaded.added,0);
+  assert.equal(reloaded.state.transactions.length,11);
 });
 
