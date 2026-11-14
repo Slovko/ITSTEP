@@ -32,8 +32,12 @@
         try { localStorage.setItem(KEY,JSON.stringify(migrated)); }
         catch { notice('Старі витрати завантажено, але новий формат поки не вдалося зберегти.',true); return migrated; }
         notice(`Перенесено старі витрати: ${migrated.transactions.length}. Дати старих записів не зберігалися, тому їм призначено сьогоднішню дату.`);
+        return migrated;
       }
-      return migrated;
+      const sample=F.addSampleExpenses(migrated,today()).state;
+      try { localStorage.setItem(KEY,JSON.stringify(sample)); }
+      catch { notice('Приклади показано, але не вдалося зберегти їх у браузері.',true); }
+      return sample;
     } catch (error) {
       notice(`Не вдалося прочитати збережені дані: ${error.message}. Наявні дані не змінено.`,true);
       return F.emptyState();
@@ -149,7 +153,7 @@
     const rules=$('#rules-list'); rules.replaceChildren();
     for(const r of state.rules) rules.append(row(r.needle,`${categoryName(r.categoryId)} · ${r.enabled?'увімкнено':'вимкнено'}`,[button(r.enabled?'Вимкнути':'Увімкнути',()=>{ r.enabled=!r.enabled; commit(); }),button('Змінити',()=>fillRule(r)),button('Видалити',()=>{ state.rules=state.rules.filter(x=>x.id!==r.id); commit(); },'remove-button')]));
   }
-  function render() { renderOptions(); renderOverview(); renderTransactions(); renderManagement(); renderPlanning(); document.documentElement.dataset.theme=state.settings.theme; $('#dark-theme').checked=state.settings.theme==='dark'; }
+  function render() { renderOptions(); renderOverview(); renderTransactions(); renderManagement(); renderPlanning(); document.documentElement.dataset.theme=state.settings.theme; $('#dark-theme').checked=state.settings.theme==='dark'; $('#add-samples').disabled=F.addSampleExpenses(state,today()).added===0; }
 
   function editTransaction(t) {
     const f=$('#transaction-form'); field(f,'id').value=t.id; field(f,'type').value=t.type; updateTransactionFields();
@@ -166,6 +170,7 @@
 
   $('#overview-month').value=dateMonth(today());
   $('#overview-month').addEventListener('change',renderOverview);
+  $('#add-samples').addEventListener('click',()=>{ const result=F.addSampleExpenses(state,today()); if(!result.added){ notice('Усі 12 прикладів уже є.'); return; } state=result.state; commit(`Додано прикладів витрат: ${result.added}.`); });
   $('#transaction-date').value=today();
   $('#schedule-date').value=today();
   $('#budget-start').value=firstOf(dateMonth(today()));
