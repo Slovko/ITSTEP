@@ -5,3 +5,35 @@
 .site-header nav a[aria-current=page]{color:var(--teal-dark);background:var(--mint);padding:8px 11px;border-radius:8px}.site-header nav a{padding:8px 2px}.breadcrumb{margin:0 0 18px;color:var(--muted);font-size:.9rem}.breadcrumb a{color:var(--teal-dark);font-weight:700}.category-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.category-metrics h2{font-size:1rem;margin:0 0 15px}.category-metrics .total-panel{min-height:0}.expense-details>a,.chart-item a,.management-row a{color:var(--teal-dark);font-weight:700;text-underline-offset:3px}.expense-details>a{font-size:.83rem}.category-metrics .metric-card{min-width:0}@media(max-width:760px){.category-metrics{grid-template-columns:1fr 1fr}.site-header nav{width:100%;justify-content:flex-start;gap:7px}}@media(max-width:520px){.category-metrics{grid-template-columns:1fr}.site-header nav a{font-size:.83rem;padding:7px 9px}}
 html[data-theme=dark] .site-header nav a[aria-current=page]{color:var(--ink)}
 
+/* Операції: форма, історія та підсумок мають власні колонки. */
+body[data-page=transactions] .shell{width:min(1500px,calc(100% - 48px))}
+#transactions{display:grid;grid-template-columns:minmax(320px,.95fr) minmax(500px,1.65fr) minmax(245px,.78fr);gap:18px;align-items:start}
+#transactions>.section-heading{grid-column:1/-1;margin-bottom:0}
+#transactions .tracker-grid{display:contents}
+#transactions .main-column{grid-column:1;grid-row:2;min-width:0}
+#transactions>.records-panel{grid-column:2;grid-row:2;min-width:0;margin:0}
+#transactions .summary-column{grid-column:3;grid-row:2;min-width:0;position:sticky;top:96px}
+#transactions .summary-column>.panel{display:flex;flex-direction:column;max-height:calc(100vh - 116px);min-height:260px}
+#transactions .category-totals{min-height:0;overflow-y:auto;padding-right:8px;scrollbar-gutter:stable}
+#transactions .filter-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+#transactions .transaction-item{grid-template-columns:20px minmax(0,1fr) auto;gap:8px 12px}
+#transactions .transaction-item .row-actions{grid-column:2/-1;justify-content:flex-end}
+@media(max-width:1180px){
+  #transactions{grid-template-columns:minmax(310px,.8fr) minmax(0,1.6fr)}
+  #transactions .summary-column{grid-column:1/-1;grid-row:3;position:static}
+  #transactions .summary-column>.panel{max-height:none;min-height:0}
+  #transactions .category-totals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 20px;overflow:visible;padding:0}
+  #transactions .filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:760px){
+  body[data-page=transactions] .shell{width:min(100% - 28px,680px)}
+  #transactions{grid-template-columns:minmax(0,1fr)}
+  #transactions .main-column{grid-column:1;grid-row:2}
+  #transactions>.records-panel{grid-column:1;grid-row:3}
+  #transactions .summary-column{grid-column:1;grid-row:4}
+  #transactions .category-totals{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:520px){
+  #transactions .filter-grid,#transactions .category-totals{grid-template-columns:minmax(0,1fr)}
+  #transactions .transaction-item .row-actions{justify-content:flex-start}
+}
