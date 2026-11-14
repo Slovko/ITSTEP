@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#123a43">
+  <title>Рахунки й категорії — Мої фінанси</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="enhancements.css">
+  <script src="finance.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body data-page="management">
+  <header class="site-header"><div class="shell header-inner"><a class="brand" href="index.html">Мої фінанси<span class="brand-mark" aria-hidden="true">●</span></a><nav aria-label="Розділи"><a href="index.html">Огляд</a><a href="transactions.html">Операції</a><a href="planning.html">Планування</a><a href="management.html" aria-current="page">Рахунки й категорії</a><a href="data.html">Дані</a><a href="registration.html">Реєстрація</a></nav></div></header>
+  <main class="shell"><p id="app-message" class="notice" role="status" hidden></p>
+<section id="management" class="app-section"><div class="section-heading"><div><p class="section-kicker">Структура</p><h2>Рахунки й категорії</h2></div></div><div class="dashboard-grid"><article class="panel"><h3>Ручні рахунки</h3><form id="account-form" class="stack-form" novalidate><input type="hidden" name="id"><div class="field"><label for="account-name">Назва рахунку</label><input id="account-name" name="name" maxlength="60" placeholder="Готівка або картка"></div><div class="field"><label for="account-opening">Початковий баланс, ₴</label><input id="account-opening" name="opening" inputmode="decimal" placeholder="0,00"></div><div class="button-row"><button class="primary-button" type="submit">Зберегти рахунок</button><button class="secondary-button" type="reset">Скасувати</button></div><p id="account-error" class="field-error" role="alert"></p></form><div id="accounts-list" class="management-list"></div></article>
+      <article class="panel"><h3>Категорії та підкатегорії</h3><form id="category-form" class="stack-form" novalidate><input type="hidden" name="id"><div class="field"><label for="category-name">Назва</label><input id="category-name" name="name" maxlength="60"></div><div class="form-row"><div class="field"><label for="category-type">Тип</label><select id="category-type" name="type"><option value="expense">Витрата</option><option value="income">Дохід</option></select></div><div class="field"><label for="category-parent">Батьківська категорія</label><select id="category-parent" name="parentId"></select></div></div><div class="button-row"><button class="primary-button" type="submit">Зберегти категорію</button><button class="secondary-button" type="reset">Скасувати</button></div><p id="category-error" class="field-error" role="alert"></p></form><div id="categories-list" class="management-list"></div></article></div></section></main>
+  <footer class="site-footer"><div class="shell">Локальний навчальний застосунок · Твої дані у твоєму браузері</div></footer>
+</body>
+</html>
+
