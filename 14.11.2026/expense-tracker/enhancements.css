@@ -37,3 +37,6 @@ body[data-page=transactions] .shell{width:min(1500px,calc(100% - 48px))}
   #transactions .filter-grid,#transactions .category-totals{grid-template-columns:minmax(0,1fr)}
   #transactions .transaction-item .row-actions{justify-content:flex-start}
 }
+
+#transactions .account-payment-explainer{margin:-6px 0 20px;padding:10px 12px;border-left:3px solid var(--teal);border-radius:0 8px 8px 0;background:var(--mint);font-size:.84rem;line-height:1.45}
+#transactions .field-hint{margin:6px 0 0;color:var(--muted);font-size:.76rem;line-height:1.4}
