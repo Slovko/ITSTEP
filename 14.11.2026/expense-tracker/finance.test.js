@@ -149,3 +149,8 @@ test('sample expenses are initialized once and stay deleted after a reload', () 
   assert.equal(reloaded.state.transactions.length,11);
 });
 
+test('category detail URLs encode unique category IDs',()=>{
+  assert.equal(F.categoryUrl('food'),'category.html?id=food');
+  assert.equal(F.categoryUrl('кава & чай'),'category.html?id=%D0%BA%D0%B0%D0%B2%D0%B0%20%26%20%D1%87%D0%B0%D0%B9');
+});
+
