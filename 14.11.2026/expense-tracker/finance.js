@@ -243,6 +243,7 @@
   }
 
   function transactionFingerprint(t) { return [t.date,t.type,t.accountId,t.toAccountId||'',t.amountKopecks,String(t.title).trim().toLocaleLowerCase('uk')].join('|'); }
+  function categoryUrl(id) { return `category.html?id=${encodeURIComponent(id)}`; }
   function mapCsvTransactions(rows, map, state) {
     const existing=new Set(state.transactions.map(transactionFingerprint)), pending=[], problems=[];
     rows.slice(1).forEach((row,index)=>{
@@ -267,6 +268,6 @@
   function toCSV(rows) { return rows.map(row=>row.map(csvCell).join(',')).join('\r\n')+'\r\n'; }
 
   return { VERSION, DEFAULT_CATEGORIES, PAYMENT_METHODS, emptyState, upgradeStarterCategories, parseMoney, parseNonnegativeMoney, validDate, migrateLegacy, addSampleExpenses, ensureSampleExpensesOnce, validateBackup,
-    accountBalance, periodTotals, filterTransactions, isCategoryWithin, budgetSpent, advanceDate, parseCSV, transactionFingerprint, mapCsvTransactions, toCSV };
+    accountBalance, periodTotals, filterTransactions, isCategoryWithin, budgetSpent, advanceDate, parseCSV, transactionFingerprint, categoryUrl, mapCsvTransactions, toCSV };
 });
 
