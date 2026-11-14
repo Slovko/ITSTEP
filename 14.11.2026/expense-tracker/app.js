@@ -1,6 +1,7 @@
 (() => {
   'use strict';
   const F = globalThis.Finance;
+  const page = document.body.dataset.page;
   const KEY = 'my-finances-v2';
   const OLD_KEY = 'expense-tracker-v1';
   const $ = selector => document.querySelector(selector);
@@ -70,6 +71,7 @@
   function categoryName(categoryId) { return state.categories.find(c=>c.id===categoryId)?.name || 'Без категорії'; }
   function categoryLabel(category) { return category.parentId ? `${categoryName(category.parentId)} / ${category.name}` : category.name; }
   function paymentName(methodId) { return F.PAYMENT_METHODS.find(m=>m.id===methodId)?.name || 'Не вказано'; }
+  function categoryLink(category) { const a=document.createElement('a'); a.href=F.categoryUrl(category.id); a.textContent=category.name; return a; }
   function activeAccounts() { return state.accounts.filter(a=>!a.archived); }
   function categories(type) { return state.categories.filter(c=>!type || c.type===type); }
   function button(label,onClick,className='secondary-button') { const el=document.createElement('button'); el.type='button'; el.className=className; el.textContent=label; el.addEventListener('click',onClick); return el; }
@@ -82,15 +84,22 @@
 
   function renderOptions() {
     const accountOptions=activeAccounts().map(a=>[a.id,a.name]);
-    for (const selector of ['#transaction-account','#transaction-destination','#schedule-account']) setOptions($(selector),accountOptions);
-    setOptions($('#filter-account'),state.accounts.map(a=>[a.id,a.name]),'Усі рахунки');
-    setOptions($('#filter-category'),state.categories.map(c=>[c.id,categoryLabel(c)]),'Усі категорії');
-    setOptions($('#filter-payment'),[['unspecified','Не вказано'],...F.PAYMENT_METHODS.map(m=>[m.id,m.name])],'Усі способи');
-    setOptions($('#transaction-payment'),F.PAYMENT_METHODS.map(m=>[m.id,m.name]),'Оберіть спосіб');
-    setOptions($('#schedule-payment'),F.PAYMENT_METHODS.map(m=>[m.id,m.name]),'Оберіть спосіб');
-    setOptions($('#budget-category'),categories('expense').map(c=>[c.id,categoryLabel(c)]),'Усі витрати');
-    setOptions($('#rule-category'),categories('expense').map(c=>[c.id,categoryLabel(c)]));
-    updateTransactionFields(); updateScheduleFields(); updateCategoryParent();
+    if (page==='transactions') {
+      for (const selector of ['#transaction-account','#transaction-destination']) setOptions($(selector),accountOptions);
+      setOptions($('#filter-account'),state.accounts.map(a=>[a.id,a.name]),'Усі рахунки');
+      setOptions($('#filter-category'),state.categories.map(c=>[c.id,categoryLabel(c)]),'Усі категорії');
+      setOptions($('#filter-payment'),[['unspecified','Не вказано'],...F.PAYMENT_METHODS.map(m=>[m.id,m.name])],'Усі способи');
+      setOptions($('#transaction-payment'),F.PAYMENT_METHODS.map(m=>[m.id,m.name]),'Оберіть спосіб');
+      updateTransactionFields();
+    }
+    if (page==='planning') {
+      setOptions($('#schedule-account'),accountOptions);
+      setOptions($('#schedule-payment'),F.PAYMENT_METHODS.map(m=>[m.id,m.name]),'Оберіть спосіб');
+      setOptions($('#budget-category'),categories('expense').map(c=>[c.id,categoryLabel(c)]),'Усі витрати');
+      setOptions($('#rule-category'),categories('expense').map(c=>[c.id,categoryLabel(c)]));
+      updateScheduleFields();
+    }
+    if (page==='management') updateCategoryParent();
   }
   function updateTransactionFields() {
     const form=$('#transaction-form'), type=value(form,'type');
@@ -131,13 +140,13 @@
     const roots=categories('expense').filter(c=>!c.parentId);
     const sums=roots.map(c=>({name:c.name,amount:expenses.filter(t=>F.isCategoryWithin(t.categoryId,c.id,state.categories)).reduce((sum,t)=>sum+t.amountKopecks,0)})).filter(c=>c.amount>0).sort((a,b)=>b.amount-a.amount);
     if (!sums.length) chart.append(row('Немає витрат','Додайте витрату, щоб побачити розподіл.'));
-    for (const item of sums) { const wrap=document.createElement('div'); wrap.className='chart-item'; const heading=document.createElement('div'); heading.className='category-row'; const name=document.createElement('span'); name.textContent=item.name; const amount=document.createElement('strong'); amount.textContent=money(item.amount); heading.append(name,amount); const bar=document.createElement('progress'); bar.max=Math.max(totals.expense,1); bar.value=item.amount; bar.setAttribute('aria-label',`${item.name}: ${money(item.amount)}`); wrap.append(heading,bar); chart.append(wrap); }
+    for (const item of sums) { const wrap=document.createElement('div'); wrap.className='chart-item'; const heading=document.createElement('div'); heading.className='category-row'; const category=roots.find(c=>c.name===item.name); const name=categoryLink(category); const amount=document.createElement('strong'); amount.textContent=money(item.amount); heading.append(name,amount); const bar=document.createElement('progress'); bar.max=Math.max(totals.expense,1); bar.value=item.amount; bar.setAttribute('aria-label',`${item.name}: ${money(item.amount)}`); wrap.append(heading,bar); chart.append(wrap); }
     const accounts=$('#account-summary'); accounts.replaceChildren();
     for (const a of state.accounts) accounts.append(row(a.name,`${a.archived?'Архів · ':''}${money(F.accountBalance(state,a.id))}`));
-    const categoryTotals=$('#category-totals'); categoryTotals.replaceChildren();
-    for (const c of roots) categoryTotals.append(row(c.name,money(state.transactions.filter(t=>t.type==='expense'&&F.isCategoryWithin(t.categoryId,c.id,state.categories)).reduce((sum,t)=>sum+t.amountKopecks,0))));
   }
   function renderTransactions() {
+    const categoryTotals=$('#category-totals'); categoryTotals.replaceChildren();
+    for (const c of categories('expense').filter(item=>!item.parentId)) { const item=row(c.name,money(state.transactions.filter(t=>t.type==='expense'&&F.isCategoryWithin(t.categoryId,c.id,state.categories)).reduce((sum,t)=>sum+t.amountKopecks,0))); item.querySelector('strong').replaceWith(categoryLink(c)); categoryTotals.append(item); }
     const rows=visibleTransactions(), list=$('#transaction-list'); list.replaceChildren();
     $('#result-count').textContent=`Знайдено: ${rows.length}`;
     $('#empty-state').textContent=state.transactions.length ? 'За поточними фільтрами операцій немає.' : 'Поки немає операцій. Додайте першу вище.';
@@ -147,7 +156,7 @@
     for (const t of rows) {
       const li=document.createElement('li'); li.className='expense-item transaction-item';
       const check=document.createElement('input'); check.type='checkbox'; check.checked=selected.has(t.id); check.setAttribute('aria-label',`Вибрати «${t.title}»`); check.addEventListener('change',()=>{ if(check.checked) selected.add(t.id); else selected.delete(t.id); $('#delete-selected').disabled=!selected.size; });
-      const details=document.createElement('div'); details.className='expense-details'; const title=document.createElement('strong'); title.textContent=t.title; const meta=document.createElement('span'); meta.textContent=`${t.date} · ${t.type==='expense'?'Витрата':t.type==='income'?'Дохід':'Переказ'} · ${accountName(t.accountId)}${t.type==='transfer'?' → '+accountName(t.toAccountId):' · '+categoryName(t.categoryId)} · ${paymentName(t.paymentMethod)}${t.tags?.length?' · '+t.tags.join(', '):''}`; details.append(title,meta);
+      const details=document.createElement('div'); details.className='expense-details'; const title=document.createElement('strong'); title.textContent=t.title; const meta=document.createElement('span'); meta.textContent=`${t.date} · ${t.type==='expense'?'Витрата':t.type==='income'?'Дохід':'Переказ'} · ${accountName(t.accountId)} · ${paymentName(t.paymentMethod)}${t.tags?.length?' · '+t.tags.join(', '):''}`; details.append(title,meta); if(t.categoryId){ const c=state.categories.find(x=>x.id===t.categoryId); if(c?.type==='expense') details.append(categoryLink(c)); else if(c){ const label=document.createElement('span'); label.textContent=c.name; details.append(label); } }
       const amount=document.createElement('strong'); amount.className='expense-amount'; amount.textContent=(t.type==='expense'?'−':t.type==='income'?'+':'')+money(t.amountKopecks);
       const actions=document.createElement('div'); actions.className='row-actions'; actions.append(button('Змінити',()=>editTransaction(t)),button('Копія',()=>duplicateTransaction(t)),button('Видалити',()=>{ if(confirmation(`Видалити операцію «${t.title}»?`)){ state.transactions=state.transactions.filter(x=>x.id!==t.id); selected.delete(t.id); commit('Операцію видалено.'); } },'remove-button'));
       li.append(check,details,amount,actions); list.append(li);
@@ -157,7 +166,7 @@
     const accounts=$('#accounts-list'); accounts.replaceChildren();
     for(const a of state.accounts) accounts.append(row(a.name,`${money(F.accountBalance(state,a.id))}${a.archived?' · архів':''}`,[button('Змінити',()=>{ const f=$('#account-form'); field(f,'id').value=a.id; field(f,'name').value=a.name; field(f,'opening').value=(a.openingKopecks/100).toFixed(2); f.scrollIntoView({behavior:'smooth'}); }),button(a.archived?'Відновити':'Архівувати',()=>{ if(!a.archived && activeAccounts().length===1){ error('account','Потрібен хоча б один активний рахунок.'); return; } a.archived=!a.archived; commit(); }),button('Видалити',()=>{ if(state.accounts.length===1 || (!a.archived && activeAccounts().length===1) || state.transactions.some(t=>t.accountId===a.id||t.toAccountId===a.id) || state.schedules.some(s=>s.accountId===a.id)){ error('account','Цей рахунок не можна видалити: він потрібен для операцій або є єдиним активним.'); return; } if(confirmation(`Видалити рахунок «${a.name}»?`)){ state.accounts=state.accounts.filter(x=>x.id!==a.id); commit(); } },'remove-button')]));
     const cats=$('#categories-list'); cats.replaceChildren();
-    for(const c of state.categories) cats.append(row(c.name,`${c.type==='expense'?'Витрата':'Дохід'}${c.parentId?' · підкатегорія '+categoryName(c.parentId):''}`,[button('Змінити',()=>{ const f=$('#category-form'); field(f,'id').value=c.id; field(f,'name').value=c.name; field(f,'type').value=c.type; updateCategoryParent(); field(f,'parentId').value=c.parentId||''; f.scrollIntoView({behavior:'smooth'}); }),button('Видалити',()=>{ if(state.transactions.some(t=>t.categoryId===c.id)||state.categories.some(x=>x.parentId===c.id)||state.budgets.some(b=>b.categoryId===c.id)||state.schedules.some(s=>s.categoryId===c.id)||state.rules.some(r=>r.categoryId===c.id)){ error('category','Категорія використовується. Спершу змініть пов’язані записи.'); return; } if(confirmation(`Видалити категорію «${c.name}»?`)){ state.categories=state.categories.filter(x=>x.id!==c.id); commit(); } },'remove-button')]));
+    for(const c of state.categories) { const item=row(c.name,`${c.type==='expense'?'Витрата':'Дохід'}${c.parentId?' · підкатегорія '+categoryName(c.parentId):''}`,[button('Змінити',()=>{ const f=$('#category-form'); field(f,'id').value=c.id; field(f,'name').value=c.name; field(f,'type').value=c.type; updateCategoryParent(); field(f,'parentId').value=c.parentId||''; f.scrollIntoView({behavior:'smooth'}); }),button('Видалити',()=>{ if(state.transactions.some(t=>t.categoryId===c.id)||state.categories.some(x=>x.parentId===c.id)||state.budgets.some(b=>b.categoryId===c.id)||state.schedules.some(s=>s.categoryId===c.id)||state.rules.some(r=>r.categoryId===c.id)){ error('category','Категорія використовується. Спершу зміни пов’язані записи.'); return; } if(confirmation(`Видалити категорію «${c.name}»?`)){ state.categories=state.categories.filter(x=>x.id!==c.id); commit(); } },'remove-button')]); if(c.type==='expense') item.querySelector('strong').replaceWith(categoryLink(c)); cats.append(item); }
   }
   function renderPlanning() {
     const budgets=$('#budgets-list'); budgets.replaceChildren();
@@ -169,7 +178,41 @@
     const rules=$('#rules-list'); rules.replaceChildren();
     for(const r of state.rules) rules.append(row(r.needle,`${categoryName(r.categoryId)} · ${r.enabled?'увімкнено':'вимкнено'}`,[button(r.enabled?'Вимкнути':'Увімкнути',()=>{ r.enabled=!r.enabled; commit(); }),button('Змінити',()=>fillRule(r)),button('Видалити',()=>{ state.rules=state.rules.filter(x=>x.id!==r.id); commit(); },'remove-button')]));
   }
-  function render() { renderOptions(); renderOverview(); renderTransactions(); renderManagement(); renderPlanning(); document.documentElement.dataset.theme=state.settings.theme; $('#dark-theme').checked=state.settings.theme==='dark'; }
+  function renderCategory() {
+    const categoryId=new URLSearchParams(location.search).get('id');
+    const category=state.categories.find(c=>c.id===categoryId && c.type==='expense');
+    $('#category-error').hidden=!!category;
+    $('#category-view').hidden=!category;
+    if (!category) { document.title='Категорію не знайдено — Мої фінанси'; return; }
+    document.title=`${category.name} — Мої фінанси`;
+    $('#category-title').textContent=category.name;
+    const month=$('#category-month').value || dateMonth(today()), start=firstOf(month), end=lastOf(month);
+    const all=state.transactions.filter(t=>t.type==='expense' && F.isCategoryWithin(t.categoryId,category.id,state.categories));
+    const period=all.filter(t=>t.date>=start && t.date<=end).sort((a,b)=>b.date.localeCompare(a.date));
+    $('#category-period-total').textContent=money(period.reduce((sum,t)=>sum+t.amountKopecks,0));
+    $('#category-all-total').textContent=money(all.reduce((sum,t)=>sum+t.amountKopecks,0));
+    $('#category-count').textContent=String(period.length);
+    const budgets=$('#category-budgets'); budgets.replaceChildren();
+    const related=state.budgets.filter(b=>b.categoryId && F.isCategoryWithin(category.id,b.categoryId,state.categories));
+    if (!related.length) budgets.append(row('Бюджету немає','Створи бюджет у розділі «Планування».'));
+    for (const b of related) budgets.append(row(b.name,`${money(F.budgetSpent(b,state.transactions,state.categories))} із ${money(b.limitKopecks)} · ${b.start} — ${b.end}`));
+    const children=$('#category-children'); children.replaceChildren();
+    const subcategories=state.categories.filter(c=>c.parentId===category.id && c.type==='expense');
+    if (!subcategories.length) children.append(row('Підкатегорій немає','Це окрема категорія.'));
+    for (const child of subcategories) { const item=row(child.name,money(all.filter(t=>F.isCategoryWithin(t.categoryId,child.id,state.categories)).reduce((sum,t)=>sum+t.amountKopecks,0))); item.querySelector('strong').replaceWith(categoryLink(child)); children.append(item); }
+    const list=$('#category-transactions'); list.replaceChildren();
+    $('#category-empty').hidden=period.length>0;
+    for (const t of period) { const li=document.createElement('li'); li.append(row(t.title,`${t.date} · ${paymentName(t.paymentMethod)} · ${money(t.amountKopecks)}`)); list.append(li); }
+  }
+  function render() {
+    document.documentElement.dataset.theme=state.settings.theme;
+    if (page==='overview') renderOverview();
+    if (page==='transactions') { renderOptions(); renderTransactions(); }
+    if (page==='management') { renderOptions(); renderManagement(); }
+    if (page==='planning') { renderOptions(); renderPlanning(); }
+    if (page==='category') renderCategory();
+    if (page==='data') $('#dark-theme').checked=state.settings.theme==='dark';
+  }
 
   function editTransaction(t) {
     const f=$('#transaction-form'); field(f,'id').value=t.id; field(f,'type').value=t.type; updateTransactionFields();
@@ -184,15 +227,11 @@
   function fillRule(r) { const f=$('#rule-form'); field(f,'id').value=r.id; field(f,'needle').value=r.needle; field(f,'categoryId').value=r.categoryId; f.scrollIntoView({behavior:'smooth'}); }
   function runSchedule(s,confirm) { if(confirm) state.transactions.unshift({id:id(),title:s.title,type:s.type,amountKopecks:s.amountKopecks,accountId:s.accountId,toAccountId:null,categoryId:s.categoryId,paymentMethod:s.paymentMethod||null,date:s.nextDate,note:'Створено із регулярної операції',tags:[]}); s.nextDate=F.advanceDate(s.nextDate,s.recurrence,s.anchorDay); commit(confirm?'Заплановану операцію додано.':'Заплановану операцію пропущено.'); }
 
-  $('#overview-month').value=dateMonth(today());
-  $('#overview-month').addEventListener('change',renderOverview);
+  if (page==='overview') { $('#overview-month').value=dateMonth(today()); $('#overview-month').addEventListener('change',renderOverview); }
+  if (page==='category') { $('#category-month').value=dateMonth(today()); $('#category-month').addEventListener('change',renderCategory); }
+  if (page==='transactions') {
   $('#transaction-date').value=today();
-  $('#schedule-date').value=today();
-  $('#budget-start').value=firstOf(dateMonth(today()));
-  $('#budget-end').value=lastOf(dateMonth(today()));
   $('#transaction-type').addEventListener('change',updateTransactionFields);
-  $('#schedule-type').addEventListener('change',updateScheduleFields);
-  $('#category-type').addEventListener('change',updateCategoryParent);
   $('#transaction-cancel').addEventListener('click',resetTransaction);
   for(const name of ['title','amount','date','account','destination','category','payment']) $(`#transaction-${name}`).addEventListener('input',()=>transactionError(name,''));
   $('#transaction-title').addEventListener('input',() => {
@@ -220,6 +259,10 @@
   $('#delete-selected').addEventListener('click',()=>{ if(!selected.size || !confirmation(`Видалити вибрані операції (${selected.size})?`)) return; state.transactions=state.transactions.filter(t=>!selected.has(t.id)); selected.clear(); commit('Вибрані операції видалено.'); });
   $('#clear-all').addEventListener('click',()=>{ if(!confirmation('Видалити всі витрати? Доходи й перекази залишаться.')) return; state.transactions=state.transactions.filter(t=>t.type!=='expense'); selected.clear(); commit('Усі витрати видалено.'); });
 
+  }
+  if (page==='management') {
+  $('#category-type').addEventListener('change',updateCategoryParent);
+
   $('#account-form').addEventListener('submit',event=>{ event.preventDefault(); const f=event.currentTarget, name=clean(value(f,'name')), openingKopecks=F.parseNonnegativeMoney(value(f,'opening')), accountId=value(f,'id');
     const message=!name?'Введіть назву рахунку.':openingKopecks===null?'Введіть коректний початковий баланс.':state.accounts.some(a=>a.name.toLocaleLowerCase('uk')===name.toLocaleLowerCase('uk')&&a.id!==accountId)?'Рахунок із такою назвою вже є.':'';
     error('account',message); if(message) return;
@@ -237,6 +280,13 @@
     f.reset(); commit('Категорію збережено.');
   });
   $('#category-form').addEventListener('reset',()=>{ error('category',''); setTimeout(updateCategoryParent,0); });
+
+  }
+  if (page==='planning') {
+  $('#schedule-date').value=today();
+  $('#budget-start').value=firstOf(dateMonth(today()));
+  $('#budget-end').value=lastOf(dateMonth(today()));
+  $('#schedule-type').addEventListener('change',updateScheduleFields);
 
   $('#budget-form').addEventListener('submit',event=>{ event.preventDefault(); const f=event.currentTarget, name=clean(value(f,'name')), limitKopecks=F.parseMoney(value(f,'limit')), start=value(f,'start'), end=value(f,'end'), categoryId=value(f,'categoryId')||null;
     const message=!name?'Введіть назву бюджету.':!limitKopecks?'Введіть додатний ліміт.':!F.validDate(start)||!F.validDate(end)||start>end?'Оберіть коректний період.':categoryId&&!categories('expense').some(c=>c.id===categoryId)?'Оберіть категорію витрат.':'';
@@ -256,8 +306,11 @@
     const rule={id:value(f,'id')||id(),needle,categoryId,enabled:true}; const index=state.rules.findIndex(r=>r.id===rule.id); if(index>=0) state.rules[index]={...state.rules[index],needle,categoryId}; else state.rules.push(rule); f.reset(); commit('Правило збережено.');
   });
 
+  }
+  if (page==='data') {
+
   $('#export-json').addEventListener('click',()=>exportFile(`moi-finansy-${today()}.json`,JSON.stringify(state,null,2),'application/json;charset=utf-8'));
-  $('#export-csv').addEventListener('click',()=>{ const rows=[['Дата','Тип','Назва','Сума','Рахунок','Рахунок отримувача','Категорія','Спосіб розрахунку','Нотатка','Теги']]; for(const t of visibleTransactions()) rows.push([t.date,t.type,t.title,(t.amountKopecks/100).toFixed(2),accountName(t.accountId),t.toAccountId?accountName(t.toAccountId):'',t.categoryId?categoryName(t.categoryId):'',t.paymentMethod?paymentName(t.paymentMethod):'',t.note||'',(t.tags||[]).join('; ')]); exportFile(`operatsii-${today()}.csv`,'\uFEFF'+F.toCSV(rows),'text/csv;charset=utf-8'); });
+  $('#export-csv').addEventListener('click',()=>{ const rows=[['Дата','Тип','Назва','Сума','Рахунок','Рахунок отримувача','Категорія','Спосіб розрахунку','Нотатка','Теги']]; for(const t of state.transactions) rows.push([t.date,t.type,t.title,(t.amountKopecks/100).toFixed(2),accountName(t.accountId),t.toAccountId?accountName(t.toAccountId):'',t.categoryId?categoryName(t.categoryId):'',t.paymentMethod?paymentName(t.paymentMethod):'',t.note||'',(t.tags||[]).join('; ')]); exportFile(`operatsii-${today()}.csv`,'\uFEFF'+F.toCSV(rows),'text/csv;charset=utf-8'); });
   $('#restore-json').addEventListener('click',async()=>{ const file=$('#backup-file').files[0]; if(!file){ notice('Оберіть файл JSON.',true); return; } try { const restored=F.validateBackup(JSON.parse(await file.text())); if(!confirmation(`Замінити поточні дані копією? У ній ${restored.transactions.length} операцій. Спочатку експортуйте поточні дані, якщо хочете їх зберегти.`)) return; state=F.ensureSampleExpensesOnce(F.upgradeStarterCategories(restored),today()).state; selected.clear(); commit('Резервну копію відновлено.'); } catch(e){ notice(`Не вдалося відновити дані: ${e.message}`,true); } });
 
   const mappingFields=[['title','Назва'],['amount','Сума'],['type','Тип'],['date','Дата'],['account','Рахунок'],['destination','Рахунок отримувача'],['category','Категорія'],['paymentMethod','Спосіб розрахунку'],['note','Нотатка'],['tags','Теги']];
@@ -273,6 +326,7 @@
     commit(`Імпортовано ${pending.length} операцій. Пропущено: ${problems.length}${problems.length?' (рядки '+problems.join(', ')+')':''}.`);
   });
   $('#dark-theme').addEventListener('change',event=>{ state.settings.theme=event.target.checked?'dark':'light'; commit(); });
+  }
   render();
 })();
 
