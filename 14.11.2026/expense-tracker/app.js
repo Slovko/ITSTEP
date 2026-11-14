@@ -25,19 +25,28 @@
   function load() {
     try {
       const saved=localStorage.getItem(KEY);
-      if (saved) return F.validateBackup(JSON.parse(saved));
+      if (saved) {
+        const loaded=F.validateBackup(JSON.parse(saved));
+        const expanded=F.upgradeStarterCategories(loaded);
+        const seeded=F.ensureSampleExpensesOnce(expanded,today());
+        if (loaded.settings.categoryCatalogVersion!==expanded.settings.categoryCatalogVersion || !loaded.settings.sampleExpensesVersion) {
+          try { localStorage.setItem(KEY,JSON.stringify(seeded.state)); }
+          catch { notice('Нові категорії та витрати показано, але не вдалося зберегти їх у браузері.',true); }
+        }
+        return seeded.state;
+      }
       const legacy=localStorage.getItem(OLD_KEY);
       const migrated=F.migrateLegacy(legacy,today());
+      const seeded=F.ensureSampleExpensesOnce(migrated,today()).state;
       if (legacy) {
-        try { localStorage.setItem(KEY,JSON.stringify(migrated)); }
-        catch { notice('Старі витрати завантажено, але новий формат поки не вдалося зберегти.',true); return migrated; }
-        notice(`Перенесено старі витрати: ${migrated.transactions.length}. Дати старих записів не зберігалися, тому їм призначено сьогоднішню дату.`);
-        return migrated;
+        try { localStorage.setItem(KEY,JSON.stringify(seeded)); }
+        catch { notice('Старі та прикладні витрати завантажено, але не вдалося зберегти новий формат.',true); return seeded; }
+        notice(`Перенесено старі витрати: ${migrated.transactions.length}; додано приклади. Дати старих записів не зберігалися, тому їм призначено сьогоднішню дату.`);
+        return seeded;
       }
-      const sample=F.addSampleExpenses(migrated,today()).state;
-      try { localStorage.setItem(KEY,JSON.stringify(sample)); }
+      try { localStorage.setItem(KEY,JSON.stringify(seeded)); }
       catch { notice('Приклади показано, але не вдалося зберегти їх у браузері.',true); }
-      return sample;
+      return seeded;
     } catch (error) {
       notice(`Не вдалося прочитати збережені дані: ${error.message}. Наявні дані не змінено.`,true);
       return F.emptyState();
@@ -59,6 +68,8 @@
   }
   function accountName(accountId) { return state.accounts.find(a=>a.id===accountId)?.name || 'Невідомий рахунок'; }
   function categoryName(categoryId) { return state.categories.find(c=>c.id===categoryId)?.name || 'Без категорії'; }
+  function categoryLabel(category) { return category.parentId ? `${categoryName(category.parentId)} / ${category.name}` : category.name; }
+  function paymentName(methodId) { return F.PAYMENT_METHODS.find(m=>m.id===methodId)?.name || 'Не вказано'; }
   function activeAccounts() { return state.accounts.filter(a=>!a.archived); }
   function categories(type) { return state.categories.filter(c=>!type || c.type===type); }
   function button(label,onClick,className='secondary-button') { const el=document.createElement('button'); el.type='button'; el.className=className; el.textContent=label; el.addEventListener('click',onClick); return el; }
@@ -66,27 +77,31 @@
   function confirmation(message) { return window.confirm(message); }
   function error(formId,message) { $(`#${formId}-error`).textContent=message || ''; }
   function transactionError(name,message) { const input=$(`#transaction-${name}`), output=$(`#transaction-${name}-error`); input.setAttribute('aria-invalid',message?'true':'false'); output.textContent=message||''; }
-  function clearTransactionErrors() { for(const name of ['title','amount','date','account','destination','category']) transactionError(name,''); }
+  function clearTransactionErrors() { for(const name of ['title','amount','date','account','destination','category','payment']) transactionError(name,''); }
   function exportFile(name,content,type) { const url=URL.createObjectURL(new Blob([content],{type})); const a=document.createElement('a'); a.href=url; a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); }
 
   function renderOptions() {
     const accountOptions=activeAccounts().map(a=>[a.id,a.name]);
     for (const selector of ['#transaction-account','#transaction-destination','#schedule-account']) setOptions($(selector),accountOptions);
     setOptions($('#filter-account'),state.accounts.map(a=>[a.id,a.name]),'Усі рахунки');
-    setOptions($('#filter-category'),state.categories.map(c=>[c.id,c.name]),'Усі категорії');
-    setOptions($('#budget-category'),categories('expense').map(c=>[c.id,c.name]),'Усі витрати');
-    setOptions($('#rule-category'),categories('expense').map(c=>[c.id,c.name]));
+    setOptions($('#filter-category'),state.categories.map(c=>[c.id,categoryLabel(c)]),'Усі категорії');
+    setOptions($('#filter-payment'),[['unspecified','Не вказано'],...F.PAYMENT_METHODS.map(m=>[m.id,m.name])],'Усі способи');
+    setOptions($('#transaction-payment'),F.PAYMENT_METHODS.map(m=>[m.id,m.name]),'Оберіть спосіб');
+    setOptions($('#schedule-payment'),F.PAYMENT_METHODS.map(m=>[m.id,m.name]),'Оберіть спосіб');
+    setOptions($('#budget-category'),categories('expense').map(c=>[c.id,categoryLabel(c)]),'Усі витрати');
+    setOptions($('#rule-category'),categories('expense').map(c=>[c.id,categoryLabel(c)]));
     updateTransactionFields(); updateScheduleFields(); updateCategoryParent();
   }
   function updateTransactionFields() {
     const form=$('#transaction-form'), type=value(form,'type');
     $('#destination-field').hidden=type!=='transfer';
     $('#transaction-category-field').hidden=type==='transfer';
-    if (type!=='transfer') setOptions(field(form,'categoryId'),categories(type).map(c=>[c.id,c.name]),'Оберіть категорію');
+    if (type!=='transfer') setOptions(field(form,'categoryId'),categories(type).map(c=>[c.id,categoryLabel(c)]),'Оберіть категорію');
+    if (type==='transfer' && !value(form,'paymentMethod')) field(form,'paymentMethod').value='bank_transfer';
   }
   function updateScheduleFields() {
     const form=$('#schedule-form');
-    setOptions(field(form,'categoryId'),categories(value(form,'type')).map(c=>[c.id,c.name]),'Оберіть категорію');
+    setOptions(field(form,'categoryId'),categories(value(form,'type')).map(c=>[c.id,categoryLabel(c)]),'Оберіть категорію');
   }
   function updateCategoryParent() {
     const form=$('#category-form'), type=value(form,'type'), editing=value(form,'id');
@@ -94,11 +109,11 @@
   }
   function currentFilters() {
     return { query:$('#filter-query').value,type:$('#filter-type').value,accountId:$('#filter-account').value,
-      categoryId:$('#filter-category').value,start:$('#filter-start').value,end:$('#filter-end').value,
+      categoryId:$('#filter-category').value,paymentMethod:$('#filter-payment').value,start:$('#filter-start').value,end:$('#filter-end').value,
       minKopecks:F.parseMoney($('#filter-min').value),maxKopecks:F.parseMoney($('#filter-max').value),tag:$('#filter-tag').value };
   }
   function visibleTransactions() {
-    const rows=F.filterTransactions(state.transactions,currentFilters());
+    const rows=F.filterTransactions(state.transactions,currentFilters(),state.categories);
     const sort=$('#filter-sort').value;
     return rows.sort((a,b)=>sort==='oldest' ? a.date.localeCompare(b.date) : sort==='high' ? b.amountKopecks-a.amountKopecks : sort==='low' ? a.amountKopecks-b.amountKopecks : b.date.localeCompare(a.date));
   }
@@ -113,13 +128,14 @@
     $('#comparison').textContent=prevTotals.expense ? `Витрати ${totals.expense>=prevTotals.expense ? 'зросли' : 'зменшилися'} на ${Math.abs(Math.round((totals.expense-prevTotals.expense)/prevTotals.expense*100))}% порівняно з ${prev}.` : 'За попередній місяць витрат немає — порівняння недоступне.';
     const chart=$('#category-chart'); chart.replaceChildren();
     const expenses=state.transactions.filter(t=>t.type==='expense' && t.date>=start && t.date<=end);
-    const sums=categories('expense').map(c=>({name:c.name,amount:expenses.filter(t=>t.categoryId===c.id).reduce((sum,t)=>sum+t.amountKopecks,0)})).filter(c=>c.amount>0).sort((a,b)=>b.amount-a.amount);
+    const roots=categories('expense').filter(c=>!c.parentId);
+    const sums=roots.map(c=>({name:c.name,amount:expenses.filter(t=>F.isCategoryWithin(t.categoryId,c.id,state.categories)).reduce((sum,t)=>sum+t.amountKopecks,0)})).filter(c=>c.amount>0).sort((a,b)=>b.amount-a.amount);
     if (!sums.length) chart.append(row('Немає витрат','Додайте витрату, щоб побачити розподіл.'));
     for (const item of sums) { const wrap=document.createElement('div'); wrap.className='chart-item'; const heading=document.createElement('div'); heading.className='category-row'; const name=document.createElement('span'); name.textContent=item.name; const amount=document.createElement('strong'); amount.textContent=money(item.amount); heading.append(name,amount); const bar=document.createElement('progress'); bar.max=Math.max(totals.expense,1); bar.value=item.amount; bar.setAttribute('aria-label',`${item.name}: ${money(item.amount)}`); wrap.append(heading,bar); chart.append(wrap); }
     const accounts=$('#account-summary'); accounts.replaceChildren();
     for (const a of state.accounts) accounts.append(row(a.name,`${a.archived?'Архів · ':''}${money(F.accountBalance(state,a.id))}`));
     const categoryTotals=$('#category-totals'); categoryTotals.replaceChildren();
-    for (const c of categories('expense')) categoryTotals.append(row(c.name,money(state.transactions.filter(t=>t.type==='expense'&&t.categoryId===c.id).reduce((sum,t)=>sum+t.amountKopecks,0))));
+    for (const c of roots) categoryTotals.append(row(c.name,money(state.transactions.filter(t=>t.type==='expense'&&F.isCategoryWithin(t.categoryId,c.id,state.categories)).reduce((sum,t)=>sum+t.amountKopecks,0))));
   }
   function renderTransactions() {
     const rows=visibleTransactions(), list=$('#transaction-list'); list.replaceChildren();
@@ -131,7 +147,7 @@
     for (const t of rows) {
       const li=document.createElement('li'); li.className='expense-item transaction-item';
       const check=document.createElement('input'); check.type='checkbox'; check.checked=selected.has(t.id); check.setAttribute('aria-label',`Вибрати «${t.title}»`); check.addEventListener('change',()=>{ if(check.checked) selected.add(t.id); else selected.delete(t.id); $('#delete-selected').disabled=!selected.size; });
-      const details=document.createElement('div'); details.className='expense-details'; const title=document.createElement('strong'); title.textContent=t.title; const meta=document.createElement('span'); meta.textContent=`${t.date} · ${t.type==='expense'?'Витрата':t.type==='income'?'Дохід':'Переказ'} · ${accountName(t.accountId)}${t.type==='transfer'?' → '+accountName(t.toAccountId):' · '+categoryName(t.categoryId)}${t.tags?.length?' · '+t.tags.join(', '):''}`; details.append(title,meta);
+      const details=document.createElement('div'); details.className='expense-details'; const title=document.createElement('strong'); title.textContent=t.title; const meta=document.createElement('span'); meta.textContent=`${t.date} · ${t.type==='expense'?'Витрата':t.type==='income'?'Дохід':'Переказ'} · ${accountName(t.accountId)}${t.type==='transfer'?' → '+accountName(t.toAccountId):' · '+categoryName(t.categoryId)} · ${paymentName(t.paymentMethod)}${t.tags?.length?' · '+t.tags.join(', '):''}`; details.append(title,meta);
       const amount=document.createElement('strong'); amount.className='expense-amount'; amount.textContent=(t.type==='expense'?'−':t.type==='income'?'+':'')+money(t.amountKopecks);
       const actions=document.createElement('div'); actions.className='row-actions'; actions.append(button('Змінити',()=>editTransaction(t)),button('Копія',()=>duplicateTransaction(t)),button('Видалити',()=>{ if(confirmation(`Видалити операцію «${t.title}»?`)){ state.transactions=state.transactions.filter(x=>x.id!==t.id); selected.delete(t.id); commit('Операцію видалено.'); } },'remove-button'));
       li.append(check,details,amount,actions); list.append(li);
@@ -145,7 +161,7 @@
   }
   function renderPlanning() {
     const budgets=$('#budgets-list'); budgets.replaceChildren();
-    for(const b of state.budgets) { const spent=F.budgetSpent(b,state.transactions), pct=Math.round(spent/b.limitKopecks*100); const item=row(b.name,`${b.start} — ${b.end} · ${b.categoryId?categoryName(b.categoryId):'Усі витрати'} · ${money(spent)} з ${money(b.limitKopecks)} · залишок ${money(b.limitKopecks-spent)} · ${pct}%${pct>=100?' · Ліміт перевищено':''}`,[button('Змінити',()=>fillBudget(b)),button('Видалити',()=>{ if(confirmation(`Видалити бюджет «${b.name}»?`)){ state.budgets=state.budgets.filter(x=>x.id!==b.id); commit(); } },'remove-button')]); item.classList.toggle('over-budget',pct>=100); budgets.append(item); }
+    for(const b of state.budgets) { const spent=F.budgetSpent(b,state.transactions,state.categories), pct=Math.round(spent/b.limitKopecks*100); const item=row(b.name,`${b.start} — ${b.end} · ${b.categoryId?categoryName(b.categoryId):'Усі витрати'} · ${money(spent)} з ${money(b.limitKopecks)} · залишок ${money(b.limitKopecks-spent)} · ${pct}%${pct>=100?' · Ліміт перевищено':''}`,[button('Змінити',()=>fillBudget(b)),button('Видалити',()=>{ if(confirmation(`Видалити бюджет «${b.name}»?`)){ state.budgets=state.budgets.filter(x=>x.id!==b.id); commit(); } },'remove-button')]); item.classList.toggle('over-budget',pct>=100); budgets.append(item); }
     const goals=$('#goals-list'); goals.replaceChildren();
     for(const g of state.goals) goals.append(row(g.name,`${money(g.currentKopecks)} з ${money(g.targetKopecks)} · залишилося ${money(Math.max(0,g.targetKopecks-g.currentKopecks))} · ${Math.round(g.currentKopecks/g.targetKopecks*100)}%`,[button('Змінити',()=>fillGoal(g)),button('Видалити',()=>{ if(confirmation(`Видалити ціль «${g.name}»?`)){ state.goals=state.goals.filter(x=>x.id!==g.id); commit(); } },'remove-button')]));
     const schedules=$('#schedules-list'); schedules.replaceChildren();
@@ -153,24 +169,23 @@
     const rules=$('#rules-list'); rules.replaceChildren();
     for(const r of state.rules) rules.append(row(r.needle,`${categoryName(r.categoryId)} · ${r.enabled?'увімкнено':'вимкнено'}`,[button(r.enabled?'Вимкнути':'Увімкнути',()=>{ r.enabled=!r.enabled; commit(); }),button('Змінити',()=>fillRule(r)),button('Видалити',()=>{ state.rules=state.rules.filter(x=>x.id!==r.id); commit(); },'remove-button')]));
   }
-  function render() { renderOptions(); renderOverview(); renderTransactions(); renderManagement(); renderPlanning(); document.documentElement.dataset.theme=state.settings.theme; $('#dark-theme').checked=state.settings.theme==='dark'; $('#add-samples').disabled=F.addSampleExpenses(state,today()).added===0; }
+  function render() { renderOptions(); renderOverview(); renderTransactions(); renderManagement(); renderPlanning(); document.documentElement.dataset.theme=state.settings.theme; $('#dark-theme').checked=state.settings.theme==='dark'; }
 
   function editTransaction(t) {
     const f=$('#transaction-form'); field(f,'id').value=t.id; field(f,'type').value=t.type; updateTransactionFields();
-    for(const [key,v] of Object.entries({title:t.title,amount:(t.amountKopecks/100).toFixed(2),date:t.date,accountId:t.accountId,toAccountId:t.toAccountId||'',categoryId:t.categoryId||'',note:t.note||'',tags:(t.tags||[]).join(', ')})) field(f,key).value=v;
+    for(const [key,v] of Object.entries({title:t.title,amount:(t.amountKopecks/100).toFixed(2),date:t.date,accountId:t.accountId,toAccountId:t.toAccountId||'',categoryId:t.categoryId||'',paymentMethod:t.paymentMethod||'',note:t.note||'',tags:(t.tags||[]).join(', ')})) field(f,key).value=v;
     $('#transaction-form-title').textContent='Редагувати операцію'; $('#transaction-submit').textContent='Зберегти зміни'; $('#transaction-cancel').hidden=false; f.scrollIntoView({behavior:'smooth'});
   }
   function duplicateTransaction(t) { editTransaction({...t,id:'',date:today()}); $('#transaction-form-title').textContent='Копія операції'; $('#transaction-submit').textContent='Додати копію'; }
   function resetTransaction() { const f=$('#transaction-form'); f.reset(); field(f,'id').value=''; field(f,'date').value=today(); $('#transaction-form-title').textContent='Нова операція'; $('#transaction-submit').textContent='Додати операцію'; $('#transaction-cancel').hidden=true; error('transaction-form',''); clearTransactionErrors(); updateTransactionFields(); }
   function fillBudget(b) { const f=$('#budget-form'); for(const [k,v] of Object.entries({id:b.id,name:b.name,limit:(b.limitKopecks/100).toFixed(2),categoryId:b.categoryId||'',start:b.start,end:b.end})) field(f,k).value=v; f.scrollIntoView({behavior:'smooth'}); }
   function fillGoal(g) { const f=$('#goal-form'); for(const [k,v] of Object.entries({id:g.id,name:g.name,target:(g.targetKopecks/100).toFixed(2),current:(g.currentKopecks/100).toFixed(2)})) field(f,k).value=v; f.scrollIntoView({behavior:'smooth'}); }
-  function fillSchedule(s) { const f=$('#schedule-form'); for(const [k,v] of Object.entries({id:s.id,title:s.title,amount:(s.amountKopecks/100).toFixed(2),type:s.type,recurrence:s.recurrence,accountId:s.accountId,nextDate:s.nextDate})) field(f,k).value=v; updateScheduleFields(); field(f,'categoryId').value=s.categoryId; f.scrollIntoView({behavior:'smooth'}); }
+  function fillSchedule(s) { const f=$('#schedule-form'); for(const [k,v] of Object.entries({id:s.id,title:s.title,amount:(s.amountKopecks/100).toFixed(2),type:s.type,recurrence:s.recurrence,accountId:s.accountId,paymentMethod:s.paymentMethod||'',nextDate:s.nextDate})) field(f,k).value=v; updateScheduleFields(); field(f,'categoryId').value=s.categoryId; f.scrollIntoView({behavior:'smooth'}); }
   function fillRule(r) { const f=$('#rule-form'); field(f,'id').value=r.id; field(f,'needle').value=r.needle; field(f,'categoryId').value=r.categoryId; f.scrollIntoView({behavior:'smooth'}); }
-  function runSchedule(s,confirm) { if(confirm) state.transactions.unshift({id:id(),title:s.title,type:s.type,amountKopecks:s.amountKopecks,accountId:s.accountId,toAccountId:null,categoryId:s.categoryId,date:s.nextDate,note:'Створено із регулярної операції',tags:[]}); s.nextDate=F.advanceDate(s.nextDate,s.recurrence,s.anchorDay); commit(confirm?'Заплановану операцію додано.':'Заплановану операцію пропущено.'); }
+  function runSchedule(s,confirm) { if(confirm) state.transactions.unshift({id:id(),title:s.title,type:s.type,amountKopecks:s.amountKopecks,accountId:s.accountId,toAccountId:null,categoryId:s.categoryId,paymentMethod:s.paymentMethod||null,date:s.nextDate,note:'Створено із регулярної операції',tags:[]}); s.nextDate=F.advanceDate(s.nextDate,s.recurrence,s.anchorDay); commit(confirm?'Заплановану операцію додано.':'Заплановану операцію пропущено.'); }
 
   $('#overview-month').value=dateMonth(today());
   $('#overview-month').addEventListener('change',renderOverview);
-  $('#add-samples').addEventListener('click',()=>{ const result=F.addSampleExpenses(state,today()); if(!result.added){ notice('Усі 12 прикладів уже є.'); return; } state=result.state; commit(`Додано прикладів витрат: ${result.added}.`); });
   $('#transaction-date').value=today();
   $('#schedule-date').value=today();
   $('#budget-start').value=firstOf(dateMonth(today()));
@@ -179,7 +194,7 @@
   $('#schedule-type').addEventListener('change',updateScheduleFields);
   $('#category-type').addEventListener('change',updateCategoryParent);
   $('#transaction-cancel').addEventListener('click',resetTransaction);
-  for(const name of ['title','amount','date','account','destination','category']) $(`#transaction-${name}`).addEventListener('input',()=>transactionError(name,''));
+  for(const name of ['title','amount','date','account','destination','category','payment']) $(`#transaction-${name}`).addEventListener('input',()=>transactionError(name,''));
   $('#transaction-title').addEventListener('input',() => {
     const form=$('#transaction-form'), type=value(form,'type'); if(type==='transfer') return;
     const rule=state.rules.find(r=>r.enabled && state.categories.find(c=>c.id===r.categoryId)?.type===type && clean(value(form,'title')).toLocaleLowerCase('uk').includes(r.needle.toLocaleLowerCase('uk')));
@@ -190,17 +205,17 @@
     event.preventDefault(); const f=event.currentTarget;
     const type=value(f,'type'), amountKopecks=F.parseMoney(value(f,'amount')),
       title=clean(value(f,'title')), date=value(f,'date'), accountId=value(f,'accountId'),
-      toAccountId=value(f,'toAccountId'), categoryId=value(f,'categoryId');
-    const errors={title:!title?'Введіть назву операції.':'',amount:!amountKopecks?'Введіть додатну суму з не більш ніж двома знаками після коми.':'',date:!F.validDate(date)?'Оберіть коректну дату.':'',account:!activeAccounts().some(a=>a.id===accountId)?'Оберіть активний рахунок.':'',destination:type==='transfer'&&(!toAccountId||toAccountId===accountId)?'Оберіть інший рахунок отримувача.':'',category:type!=='transfer'&&!categories(type).some(c=>c.id===categoryId)?'Оберіть категорію відповідного типу.':''};
+      toAccountId=value(f,'toAccountId'), categoryId=value(f,'categoryId'), paymentMethod=value(f,'paymentMethod');
+    const errors={title:!title?'Введіть назву операції.':'',amount:!amountKopecks?'Введіть додатну суму з не більш ніж двома знаками після коми.':'',date:!F.validDate(date)?'Оберіть коректну дату.':'',account:!activeAccounts().some(a=>a.id===accountId)?'Оберіть активний рахунок.':'',destination:type==='transfer'&&(!toAccountId||toAccountId===accountId)?'Оберіть інший рахунок отримувача.':'',category:type!=='transfer'&&!categories(type).some(c=>c.id===categoryId)?'Оберіть категорію відповідного типу.':'',payment:!F.PAYMENT_METHODS.some(m=>m.id===paymentMethod)?'Оберіть спосіб розрахунку.':''};
     for(const [name,message] of Object.entries(errors)) transactionError(name,message);
     const first=Object.keys(errors).find(name=>errors[name]);
     error('transaction-form',first?'Виправте помилки у формі.':''); if(first){ $(`#transaction-${first}`).focus(); return; }
-    const transaction={id:value(f,'id')||id(),title,type,amountKopecks,date,accountId,toAccountId:type==='transfer'?toAccountId:null,categoryId:type==='transfer'?null:categoryId,note:clean(value(f,'note')),tags:value(f,'tags').split(',').map(clean).filter(Boolean).slice(0,10)};
+    const transaction={id:value(f,'id')||id(),title,type,amountKopecks,date,accountId,toAccountId:type==='transfer'?toAccountId:null,categoryId:type==='transfer'?null:categoryId,paymentMethod,note:clean(value(f,'note')),tags:value(f,'tags').split(',').map(clean).filter(Boolean).slice(0,10)};
     const index=state.transactions.findIndex(t=>t.id===transaction.id);
     if(index>=0) state.transactions[index]=transaction; else state.transactions.unshift(transaction);
     resetTransaction(); commit('Операцію збережено.');
   });
-  for(const selector of ['#filter-query','#filter-type','#filter-account','#filter-category','#filter-start','#filter-end','#filter-min','#filter-max','#filter-tag','#filter-sort']) $(selector).addEventListener('input',renderTransactions);
+  for(const selector of ['#filter-query','#filter-type','#filter-account','#filter-payment','#filter-category','#filter-start','#filter-end','#filter-min','#filter-max','#filter-tag','#filter-sort']) $(selector).addEventListener('input',renderTransactions);
   $('#select-visible').addEventListener('click',()=>{ for(const t of visibleTransactions()) selected.add(t.id); renderTransactions(); });
   $('#delete-selected').addEventListener('click',()=>{ if(!selected.size || !confirmation(`Видалити вибрані операції (${selected.size})?`)) return; state.transactions=state.transactions.filter(t=>!selected.has(t.id)); selected.clear(); commit('Вибрані операції видалено.'); });
   $('#clear-all').addEventListener('click',()=>{ if(!confirmation('Видалити всі витрати? Доходи й перекази залишаться.')) return; state.transactions=state.transactions.filter(t=>t.type!=='expense'); selected.clear(); commit('Усі витрати видалено.'); });
@@ -232,9 +247,9 @@
     const message=!name?'Введіть назву цілі.':!targetKopecks?'Введіть додатну цільову суму.':currentKopecks===null?'Введіть коректну накопичену суму.':''; error('goal',message); if(message) return;
     const goal={id:value(f,'id')||id(),name,targetKopecks,currentKopecks}; const index=state.goals.findIndex(g=>g.id===goal.id); if(index>=0) state.goals[index]=goal; else state.goals.push(goal); f.reset(); commit('Ціль збережено.');
   });
-  $('#schedule-form').addEventListener('submit',event=>{ event.preventDefault(); const f=event.currentTarget,title=clean(value(f,'title')),amountKopecks=F.parseMoney(value(f,'amount')),type=value(f,'type'),recurrence=value(f,'recurrence'),accountId=value(f,'accountId'),categoryId=value(f,'categoryId'),nextDate=value(f,'nextDate');
-    const message=!title?'Введіть назву.':!amountKopecks?'Введіть додатну суму.':!F.validDate(nextDate)?'Оберіть коректну дату.':!activeAccounts().some(a=>a.id===accountId)?'Оберіть активний рахунок.':!categories(type).some(c=>c.id===categoryId)?'Оберіть категорію.':''; error('schedule',message); if(message) return;
-    const schedule={id:value(f,'id')||id(),title,amountKopecks,type,recurrence,accountId,categoryId,nextDate,anchorDay:Number(nextDate.slice(-2))}; const index=state.schedules.findIndex(s=>s.id===schedule.id); if(index>=0) state.schedules[index]=schedule; else state.schedules.push(schedule); f.reset(); field(f,'nextDate').value=today(); commit('Регулярну операцію збережено.');
+  $('#schedule-form').addEventListener('submit',event=>{ event.preventDefault(); const f=event.currentTarget,title=clean(value(f,'title')),amountKopecks=F.parseMoney(value(f,'amount')),type=value(f,'type'),recurrence=value(f,'recurrence'),accountId=value(f,'accountId'),categoryId=value(f,'categoryId'),paymentMethod=value(f,'paymentMethod'),nextDate=value(f,'nextDate');
+    const message=!title?'Введіть назву.':!amountKopecks?'Введіть додатну суму.':!F.validDate(nextDate)?'Оберіть коректну дату.':!activeAccounts().some(a=>a.id===accountId)?'Оберіть активний рахунок.':!categories(type).some(c=>c.id===categoryId)?'Оберіть категорію.':!F.PAYMENT_METHODS.some(m=>m.id===paymentMethod)?'Оберіть спосіб розрахунку.':''; error('schedule',message); if(message) return;
+    const schedule={id:value(f,'id')||id(),title,amountKopecks,type,recurrence,accountId,categoryId,paymentMethod,nextDate,anchorDay:Number(nextDate.slice(-2))}; const index=state.schedules.findIndex(s=>s.id===schedule.id); if(index>=0) state.schedules[index]=schedule; else state.schedules.push(schedule); f.reset(); field(f,'nextDate').value=today(); commit('Регулярну операцію збережено.');
   });
   $('#rule-form').addEventListener('submit',event=>{ event.preventDefault(); const f=event.currentTarget,needle=clean(value(f,'needle')),categoryId=value(f,'categoryId');
     const message=!needle?'Введіть слово для пошуку.':!categories('expense').some(c=>c.id===categoryId)?'Оберіть категорію витрат.':''; error('rule',message); if(message) return;
@@ -242,11 +257,11 @@
   });
 
   $('#export-json').addEventListener('click',()=>exportFile(`moi-finansy-${today()}.json`,JSON.stringify(state,null,2),'application/json;charset=utf-8'));
-  $('#export-csv').addEventListener('click',()=>{ const rows=[['Дата','Тип','Назва','Сума','Рахунок','Рахунок отримувача','Категорія','Нотатка','Теги']]; for(const t of visibleTransactions()) rows.push([t.date,t.type,t.title,(t.amountKopecks/100).toFixed(2),accountName(t.accountId),t.toAccountId?accountName(t.toAccountId):'',t.categoryId?categoryName(t.categoryId):'',t.note||'',(t.tags||[]).join('; ')]); exportFile(`operatsii-${today()}.csv`,'\uFEFF'+F.toCSV(rows),'text/csv;charset=utf-8'); });
-  $('#restore-json').addEventListener('click',async()=>{ const file=$('#backup-file').files[0]; if(!file){ notice('Оберіть файл JSON.',true); return; } try { const restored=F.validateBackup(JSON.parse(await file.text())); if(!confirmation(`Замінити поточні дані копією? У ній ${restored.transactions.length} операцій. Спочатку експортуйте поточні дані, якщо хочете їх зберегти.`)) return; state=restored; selected.clear(); commit('Резервну копію відновлено.'); } catch(e){ notice(`Не вдалося відновити дані: ${e.message}`,true); } });
+  $('#export-csv').addEventListener('click',()=>{ const rows=[['Дата','Тип','Назва','Сума','Рахунок','Рахунок отримувача','Категорія','Спосіб розрахунку','Нотатка','Теги']]; for(const t of visibleTransactions()) rows.push([t.date,t.type,t.title,(t.amountKopecks/100).toFixed(2),accountName(t.accountId),t.toAccountId?accountName(t.toAccountId):'',t.categoryId?categoryName(t.categoryId):'',t.paymentMethod?paymentName(t.paymentMethod):'',t.note||'',(t.tags||[]).join('; ')]); exportFile(`operatsii-${today()}.csv`,'\uFEFF'+F.toCSV(rows),'text/csv;charset=utf-8'); });
+  $('#restore-json').addEventListener('click',async()=>{ const file=$('#backup-file').files[0]; if(!file){ notice('Оберіть файл JSON.',true); return; } try { const restored=F.validateBackup(JSON.parse(await file.text())); if(!confirmation(`Замінити поточні дані копією? У ній ${restored.transactions.length} операцій. Спочатку експортуйте поточні дані, якщо хочете їх зберегти.`)) return; state=F.ensureSampleExpensesOnce(F.upgradeStarterCategories(restored),today()).state; selected.clear(); commit('Резервну копію відновлено.'); } catch(e){ notice(`Не вдалося відновити дані: ${e.message}`,true); } });
 
-  const mappingFields=[['title','Назва'],['amount','Сума'],['type','Тип'],['date','Дата'],['account','Рахунок'],['destination','Рахунок отримувача'],['category','Категорія'],['note','Нотатка'],['tags','Теги']];
-  $('#csv-file').addEventListener('change',async()=>{ const file=$('#csv-file').files[0]; if(!file){ $('#csv-mapping').hidden=true; return; } try { csvRows=F.parseCSV(await file.text()); if(csvRows.length<2) throw new Error('У файлі немає рядків для імпорту.'); const columns=$('#csv-columns'); columns.replaceChildren(); const headers=csvRows[0]; for(const [key,label] of mappingFields){ const wrap=document.createElement('div'); wrap.className='field'; const title=document.createElement('label'); title.htmlFor=`csv-${key}`; title.textContent=label; const select=document.createElement('select'); select.id=`csv-${key}`; select.append(option('','Не імпортувати')); headers.forEach((h,i)=>select.append(option(String(i),h||`Колонка ${i+1}`))); const guess=headers.findIndex(h=>h.toLocaleLowerCase('uk').includes(({title:'назва',amount:'сума',type:'тип',date:'дата',account:'рахунок',destination:'отримувача',category:'категорія',note:'нотатка',tags:'теги'})[key])); if(guess>=0) select.value=String(guess); wrap.append(title,select); columns.append(wrap); } $('#csv-preview').textContent=`Рядків у файлі: ${csvRows.length-1}. Перший: ${csvRows[1].join(' · ')}`; $('#csv-mapping').hidden=false; notice('CSV прочитано. Перевірте відповідність стовпців перед імпортом.'); } catch(e){ csvRows=null; $('#csv-mapping').hidden=true; notice(`Помилка CSV: ${e.message}`,true); } });
+  const mappingFields=[['title','Назва'],['amount','Сума'],['type','Тип'],['date','Дата'],['account','Рахунок'],['destination','Рахунок отримувача'],['category','Категорія'],['paymentMethod','Спосіб розрахунку'],['note','Нотатка'],['tags','Теги']];
+  $('#csv-file').addEventListener('change',async()=>{ const file=$('#csv-file').files[0]; if(!file){ $('#csv-mapping').hidden=true; return; } try { csvRows=F.parseCSV(await file.text()); if(csvRows.length<2) throw new Error('У файлі немає рядків для імпорту.'); const columns=$('#csv-columns'); columns.replaceChildren(); const headers=csvRows[0]; for(const [key,label] of mappingFields){ const wrap=document.createElement('div'); wrap.className='field'; const title=document.createElement('label'); title.htmlFor=`csv-${key}`; title.textContent=label; const select=document.createElement('select'); select.id=`csv-${key}`; select.append(option('','Не імпортувати')); headers.forEach((h,i)=>select.append(option(String(i),h||`Колонка ${i+1}`))); const guess=headers.findIndex(h=>h.toLocaleLowerCase('uk').includes(({title:'назва',amount:'сума',type:'тип',date:'дата',account:'рахунок',destination:'отримувача',category:'категорія',paymentMethod:'спосіб',note:'нотатка',tags:'теги'})[key])); if(guess>=0) select.value=String(guess); wrap.append(title,select); columns.append(wrap); } $('#csv-preview').textContent=`Рядків у файлі: ${csvRows.length-1}. Перший: ${csvRows[1].join(' · ')}`; $('#csv-mapping').hidden=false; notice('CSV прочитано. Перевірте відповідність стовпців перед імпортом.'); } catch(e){ csvRows=null; $('#csv-mapping').hidden=true; notice(`Помилка CSV: ${e.message}`,true); } });
   $('#import-csv').addEventListener('click',()=>{
     if(!csvRows) return;
     const map=Object.fromEntries(mappingFields.map(([key])=>[key,$(`#csv-${key}`).value]));
