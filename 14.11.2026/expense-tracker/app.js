@@ -129,7 +129,7 @@
   function updateTransferRate() {
     const from=F.parseMoney($('#transaction-amount').value), to=F.parseMoney($('#transaction-to-amount').value);
     const shown=!$('#transfer-amount-field').hidden && from && to;
-    $('#transfer-rate').textContent=shown?`Курс цієї операції: 1 ${accountCurrency($('#transaction-account').value)} ≈ ${(to/from).toLocaleString('uk-UA',{maximumFractionDigits:4})} ${accountCurrency($('#transaction-destination').value)}.`:'Введи суму, що надійшла на інший рахунок. Застосунок покаже курс цієї операції.';
+    $('#transfer-rate').textContent=shown?`Курс цієї операції: 1 ${accountCurrency($('#transaction-account').value)} ≈ ${(to/from).toLocaleString('uk-UA',{maximumFractionDigits:4})} ${accountCurrency($('#transaction-destination').value)}.`:'';
   }
   function updateScheduleFields() {
     const form=$('#schedule-form');
