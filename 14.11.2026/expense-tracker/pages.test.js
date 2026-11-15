@@ -36,3 +36,19 @@ test('category detail has its own page and navigation',()=>{
   for(const asset of ['style.css','enhancements.css','finance.js','app.js']) assert(html.includes(asset),`category page lacks ${asset}`);
 });
 
+test('currency controls exist where accounts, transfers, budgets and goals are edited',()=>{
+  const read=name=>fs.readFileSync(path.join(__dirname,name),'utf8');
+  const management=read('management.html'), transactions=read('transactions.html'), planning=read('planning.html');
+  for(const id of ['account-type','account-currency']) assert(management.includes(`id="${id}"`));
+  for(const id of ['transaction-to-amount','transfer-amount-field','transaction-amount-label']) assert(transactions.includes(`id="${id}"`));
+  for(const id of ['budget-currency','goal-currency']) assert(planning.includes(`id="${id}"`));
+  for(const currency of ['UAH','EUR','USD']) assert(management.includes(`value="${currency}"`));
+});
+
+test('page element IDs stay unique for form labels and scripts',()=>{
+  for(const file of [...Object.keys(pages),'category.html']){
+    const html=fs.readFileSync(path.join(__dirname,file),'utf8');
+    const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(match=>match[1]);
+    assert.equal(new Set(ids).size,ids.length,`${file} has duplicate element IDs`);
+  }
+});
