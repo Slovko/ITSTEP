@@ -47,3 +47,6 @@ body[data-page=transactions] .shell{width:min(1500px,calc(100% - 48px))}
 #overview-expense,#category-period-total{font-size:clamp(1.45rem,2vw,2rem);line-height:1.45}
 #overview-income,#overview-net,#overview-balance,#category-all-total{font-size:clamp(1.2rem,1.8vw,1.7rem);line-height:1.5}
 #transactions .expense-amount{white-space:normal;text-align:right;overflow-wrap:anywhere}
+
+#data #restore-json{display:block;width:100%;min-height:48px;margin-top:16px;border-color:var(--teal);background:var(--mint);color:var(--teal-dark);text-align:center}
+#data #restore-json:hover{filter:brightness(.96)}
