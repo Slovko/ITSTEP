@@ -38,8 +38,10 @@ body[data-page=transactions] .shell{width:min(1500px,calc(100% - 48px))}
   #transactions .transaction-item .row-actions{justify-content:flex-start}
 }
 
-#transactions .account-payment-explainer{margin:-6px 0 20px;padding:10px 12px;border-left:3px solid var(--teal);border-radius:0 8px 8px 0;background:var(--mint);font-size:.84rem;line-height:1.45}
 #transactions .field-hint,#management .field-hint{margin:6px 0 0;color:var(--muted);font-size:.76rem;line-height:1.4}
+#transactions #transfer-rate:empty{display:none}
+#transactions #transaction-form>.button-row{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin-top:18px}
+#transactions #transaction-form>.button-row button{width:100%}
 
 #overview-expense,#overview-income,#overview-net,#overview-balance,#category-period-total,#category-all-total,#comparison,.management-row small{white-space:pre-line}
 #overview-expense,#category-period-total{font-size:clamp(1.45rem,2vw,2rem);line-height:1.45}
