@@ -46,6 +46,11 @@ body[data-page=transactions] .shell{width:min(1500px,calc(100% - 48px))}
 #overview-expense,#overview-income,#overview-net,#overview-balance,#category-period-total,#category-all-total,#comparison,.management-row small{white-space:pre-line}
 #overview-expense,#category-period-total{font-size:clamp(1.45rem,2vw,2rem);line-height:1.45}
 #overview-income,#overview-net,#overview-balance,#category-all-total{font-size:clamp(1.2rem,1.8vw,1.7rem);line-height:1.5}
+.all-time-panel{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center;gap:20px;margin-bottom:20px}
+.all-time-panel h3{margin:0 0 8px}
+.all-time-panel .muted{margin:0}
+.all-time-amount{margin:0;font-size:clamp(1.25rem,2vw,1.8rem);font-weight:800;line-height:1.5;white-space:pre-line}
+@media(max-width:760px){.all-time-panel{grid-template-columns:1fr}}
 #transactions .expense-amount{white-space:normal;text-align:right;overflow-wrap:anywhere}
 
 #data #restore-json{display:block;width:100%;min-height:48px;margin-top:16px;border-color:var(--teal);background:var(--mint);color:var(--teal-dark);text-align:center}
