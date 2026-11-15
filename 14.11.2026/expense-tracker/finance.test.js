@@ -60,7 +60,60 @@ test('recurring dates advance without creating transactions', () => {
 
 test('backup validation rejects malformed data and accepts a full state', () => {
   assert.throws(()=>F.validateBackup({version:99}),/версі/);
-  assert.equal(F.validateBackup(F.emptyState()).version,2);
+  assert.equal(F.validateBackup(F.emptyState()).version,3);
+});
+
+test('version 2 data gains UAH accounts and plans without losing records', () => {
+  const old=F.emptyState(); old.version=2;
+  old.accounts[0]={id:'cash',name:'Готівка',openingKopecks:1234,archived:false};
+  old.transactions.push({id:'old',title:'Кава',type:'expense',amountKopecks:250,accountId:'cash',categoryId:'food',date:'2026-11-15',tags:[]});
+  old.budgets.push({id:'budget',name:'Їжа',limitKopecks:5000,start:'2026-11-01',end:'2026-11-30',categoryId:'food'});
+  old.goals.push({id:'goal',name:'Резерв',targetKopecks:10000,currentKopecks:1000});
+  const migrated=F.validateBackup(old);
+  assert.equal(migrated.version,3);
+  assert.deepEqual([migrated.accounts[0].currency,migrated.accounts[0].type],['UAH','cash']);
+  assert.equal(migrated.transactions[0].amountKopecks,250);
+  assert.equal(migrated.budgets[0].currency,'UAH');
+  assert.equal(migrated.goals[0].currency,'UAH');
+  assert.equal(F.accountBalance(migrated,'cash'),984);
+});
+
+test('different currencies remain separate and cross-currency transfer uses received amount', () => {
+  const state=F.emptyState();
+  state.accounts.push({id:'eur',name:'Готівка',type:'cash',currency:'EUR',openingKopecks:10000,archived:false});
+  state.accounts.push({id:'usd',name:'Банк',type:'bank',currency:'USD',openingKopecks:0,archived:false});
+  state.transactions.push({id:'exchange',title:'Обмін',type:'transfer',amountKopecks:5000,toAmountKopecks:5600,accountId:'eur',toAccountId:'usd',date:'2026-11-15',tags:[]});
+  state.transactions.push({id:'coffee',title:'Кава',type:'expense',amountKopecks:600,accountId:'eur',categoryId:'food',date:'2026-11-15',tags:[]});
+  assert.equal(F.accountBalance(state,'eur'),4400);
+  assert.equal(F.accountBalance(state,'usd'),5600);
+  assert.deepEqual(F.totalsByCurrency(state,'2026-11-01','2026-11-30').EUR,{income:0,expense:600,net:-600});
+  assert.deepEqual(F.totalsByCurrency(state,'2026-11-01','2026-11-30').USD,{income:0,expense:0,net:0});
+  assert.equal(F.validateBackup(state).transactions[0].toAmountKopecks,5600);
+  const missing=structuredClone(state); delete missing.transactions[0].toAmountKopecks;
+  assert.throws(()=>F.validateBackup(missing),/транзакції/);
+  const sameCurrency=structuredClone(state); sameCurrency.accounts.find(a=>a.id==='usd').currency='EUR';
+  assert.throws(()=>F.validateBackup(sameCurrency),/транзакції/);
+});
+
+test('budget spending includes only transactions in its currency', () => {
+  const state=F.emptyState();
+  state.accounts.push({id:'eur',name:'Банк',type:'bank',currency:'EUR',openingKopecks:0,archived:false});
+  const rows=[{type:'expense',amountKopecks:3000,accountId:'cash',categoryId:'food',date:'2026-11-15'},
+    {type:'expense',amountKopecks:2000,accountId:'eur',categoryId:'food',date:'2026-11-15'}];
+  assert.equal(F.budgetSpent({currency:'EUR',categoryId:'food',start:'2026-11-01',end:'2026-11-30'},rows,state.categories,state.accounts),2000);
+});
+
+test('CSV import preserves currency and received amount in cross-currency transfers', () => {
+  const state=F.emptyState();
+  state.accounts.push({id:'eur',name:'Готівка',type:'cash',currency:'EUR',openingKopecks:0,archived:false});
+  const rows=[['Назва','Сума','Валюта','Дата','Тип','Рахунок','Рахунок отримувача','Валюта отримувача','Сума зарахування'],
+    ['Обмін','100.00','UAH','2026-11-15','transfer','Готівка','Готівка','EUR','2.20']];
+  const map={title:'0',amount:'1',currency:'2',date:'3',type:'4',account:'5',destination:'6',destinationCurrency:'7',toAmount:'8'};
+  const result=F.mapCsvTransactions(rows,map,state);
+  assert.deepEqual(result.problems,[]);
+  assert.equal(result.pending[0].accountId,'cash');
+  assert.equal(result.pending[0].toAccountId,'eur');
+  assert.equal(result.pending[0].toAmountKopecks,220);
 });
 
 test('CSV parser handles quotes and duplicate detection', () => {
@@ -153,4 +206,3 @@ test('category detail URLs encode unique category IDs',()=>{
   assert.equal(F.categoryUrl('food'),'category.html?id=food');
   assert.equal(F.categoryUrl('кава & чай'),'category.html?id=%D0%BA%D0%B0%D0%B2%D0%B0%20%26%20%D1%87%D0%B0%D0%B9');
 });
-
