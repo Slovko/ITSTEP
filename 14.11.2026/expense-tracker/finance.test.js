@@ -18,6 +18,19 @@ test('money parses to kopecks exactly', () => {
   assert.equal(F.parseMoney('1.234'), null);
 });
 
+test('all-time expense totals include every month and keep currencies separate', () => {
+  const state = F.emptyState();
+  state.accounts.push({id:'euros',name:'Євро',type:'bank',currency:'EUR',openingKopecks:0,archived:false});
+  state.transactions = [
+    {type:'expense',amountKopecks:125,date:'2025-01-10',accountId:'cash'},
+    {type:'expense',amountKopecks:235,date:'2026-11-15',accountId:'cash'},
+    {type:'expense',amountKopecks:450,date:'2024-03-01',accountId:'euros'},
+    {type:'income',amountKopecks:1000,date:'2026-11-15',accountId:'cash'},
+    {type:'transfer',amountKopecks:200,date:'2026-11-15',accountId:'cash',toAccountId:'euros'}
+  ];
+  assert.deepEqual(F.allTimeExpenseTotals(state), {UAH:360,EUR:450,USD:0});
+});
+
 test('balances account for income, expense, and transfer once', () => {
   const state = F.emptyState();
   state.accounts.push({id:'bank', name:'Картка', openingKopecks:1000, archived:false});
