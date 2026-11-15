@@ -153,6 +153,7 @@
     const month=$('#overview-month').value || dateMonth(today()), start=firstOf(month), end=lastOf(month);
     const totals=F.totalsByCurrency(state,start,end);
     for(const [id,key] of [['#overview-expense','expense'],['#overview-income','income'],['#overview-net','net']]) $(id).textContent=moneyLines(Object.fromEntries(F.CURRENCIES.map(currency=>[currency,totals[currency][key]])));
+    $('#overview-all-time-expense').textContent=moneyLines(F.allTimeExpenseTotals(state));
     const balances=Object.fromEntries(F.CURRENCIES.map(currency=>[currency,0]));
     for(const a of state.accounts) balances[a.currency]+=F.accountBalance(state,a.id);
     $('#overview-balance').textContent=moneyLines(balances);
