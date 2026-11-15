@@ -4,7 +4,9 @@
   root.Finance = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
-  const VERSION = 2;
+  const VERSION = 3;
+  const CURRENCIES = ['UAH','EUR','USD'];
+  const ACCOUNT_TYPES = ['cash','bank'];
   const DEFAULT_CATEGORIES = [
     { id: 'food', name: 'Їжа', type: 'expense', parentId: null },
     { id: 'groceries', name: 'Продукти', type: 'expense', parentId: 'food' },
@@ -45,7 +47,7 @@
   function emptyState() {
     return {
       version: VERSION,
-      accounts: [{ id: 'cash', name: 'Готівка', openingKopecks: 0, archived: false }],
+      accounts: [{ id: 'cash', name: 'Готівка', type:'cash', currency:'UAH', openingKopecks: 0, archived: false }],
       categories: DEFAULT_CATEGORIES.map(item => ({ ...item })),
       transactions: [], budgets: [], goals: [], schedules: [], rules: [],
       settings: { currency: 'UAH', theme: 'light', categoryCatalogVersion: 2 }
@@ -122,7 +124,7 @@
   function addSampleExpenses(state, baseDate) {
     if (!validDate(baseDate)) throw new Error('Некоректна дата прикладів.');
     const next=structuredClone(state);
-    const account=next.accounts.find(a=>!a.archived);
+    const account=next.accounts.find(a=>!a.archived && a.currency==='UAH');
     if (!account) return {state:next,added:0};
     if (!next.categories.some(c=>c.type==='expense')) next.categories.push({id:'demo-other',name:'Інше',type:'expense',parentId:null});
     const fallback=next.categories.find(c=>c.type==='expense');
@@ -147,22 +149,31 @@
   }
 
   function validateBackup(raw) {
-    if (!raw || typeof raw !== 'object' || raw.version !== VERSION) throw new Error('Непідтримувана версія резервної копії.');
+    if (!raw || typeof raw !== 'object' || ![2,VERSION].includes(raw.version)) throw new Error('Непідтримувана версія резервної копії.');
+    const state=structuredClone(raw);
     const names = ['accounts', 'categories', 'transactions', 'budgets', 'goals', 'schedules', 'rules'];
-    if (names.some(name => !Array.isArray(raw[name]))) throw new Error('У копії бракує необхідних списків.');
-    if (!raw.settings || typeof raw.settings !== 'object') throw new Error('У копії бракує налаштувань.');
+    if (names.some(name => !Array.isArray(state[name]))) throw new Error('У копії бракує необхідних списків.');
+    if (names.some(name => state[name].some(item=>!item || typeof item!=='object'))) throw new Error('У копії є некоректні записи.');
+    if (!state.settings || typeof state.settings !== 'object') throw new Error('У копії бракує налаштувань.');
+    if (state.version===2) {
+      state.accounts.forEach(a=>{ a.currency='UAH'; a.type=typeof a.name==='string' && a.name.toLocaleLowerCase('uk')==='готівка'?'cash':'bank'; });
+      state.budgets.forEach(b=>{ b.currency='UAH'; });
+      state.goals.forEach(g=>{ g.currency='UAH'; });
+      state.transactions.forEach(t=>{ if(t.type==='transfer') t.toAmountKopecks=t.amountKopecks; });
+      state.version=VERSION;
+    }
     const unique = rows => rows.every((item, index) => item && typeof item.id === 'string' && item.id && rows.findIndex(other => other.id === item.id) === index);
-    if (names.some(name => !unique(raw[name]))) throw new Error('У копії є некоректні або повторні ідентифікатори.');
-    if (!raw.accounts.length || raw.accounts.some(a => typeof a.name !== 'string' || !a.name.trim() || !Number.isSafeInteger(a.openingKopecks) || a.openingKopecks < 0)) throw new Error('Некоректні рахунки.');
-    if (raw.categories.some(c => typeof c.name !== 'string' || !c.name.trim() || !['expense','income'].includes(c.type) || (c.parentId && !raw.categories.some(p => p.id === c.parentId && p.type === c.type)))) throw new Error('Некоректні категорії.');
-    if (raw.transactions.some(t => !['income','expense','transfer'].includes(t.type) || !Number.isSafeInteger(t.amountKopecks) || t.amountKopecks <= 0 || !validDate(t.date) || typeof t.title !== 'string' || !t.title.trim() || !raw.accounts.some(a => a.id === t.accountId) || (t.type === 'transfer' ? !raw.accounts.some(a => a.id === t.toAccountId && a.id !== t.accountId) : !raw.categories.some(c => c.id === t.categoryId && c.type === t.type)) || !Array.isArray(t.tags))) throw new Error('Некоректні транзакції.');
-    if (raw.transactions.some(t => t.paymentMethod != null && !PAYMENT_METHODS.some(m => m.id === t.paymentMethod))) throw new Error('Некоректний спосіб оплати у транзакції.');
-    if (raw.budgets.some(b => !Number.isSafeInteger(b.limitKopecks) || b.limitKopecks <= 0 || !validDate(b.start) || !validDate(b.end) || b.start > b.end || (b.categoryId && !raw.categories.some(c => c.id === b.categoryId)))) throw new Error('Некоректні бюджети.');
-    if (raw.goals.some(g => typeof g.name !== 'string' || !g.name.trim() || !Number.isSafeInteger(g.targetKopecks) || g.targetKopecks <= 0 || !Number.isSafeInteger(g.currentKopecks) || g.currentKopecks < 0)) throw new Error('Некоректні цілі.');
-    if (raw.schedules.some(s => !['income','expense'].includes(s.type) || !['daily','weekly','monthly'].includes(s.recurrence) || !validDate(s.nextDate) || !Number.isSafeInteger(s.amountKopecks) || s.amountKopecks <= 0 || !raw.accounts.some(a => a.id === s.accountId) || !raw.categories.some(c => c.id === s.categoryId && c.type === s.type))) throw new Error('Некоректні заплановані операції.');
-    if (raw.schedules.some(s => s.paymentMethod != null && !PAYMENT_METHODS.some(m => m.id === s.paymentMethod))) throw new Error('Некоректний спосіб розрахунку у запланованій операції.');
-    if (raw.rules.some(r => typeof r.needle !== 'string' || !r.needle.trim() || !raw.categories.some(c => c.id === r.categoryId))) throw new Error('Некоректні правила.');
-    return structuredClone(raw);
+    if (names.some(name => !unique(state[name]))) throw new Error('У копії є некоректні або повторні ідентифікатори.');
+    if (!state.accounts.length || state.accounts.some(a => typeof a.name !== 'string' || !a.name.trim() || !ACCOUNT_TYPES.includes(a.type) || !CURRENCIES.includes(a.currency) || !Number.isSafeInteger(a.openingKopecks) || a.openingKopecks < 0)) throw new Error('Некоректні рахунки.');
+    if (state.categories.some(c => typeof c.name !== 'string' || !c.name.trim() || !['expense','income'].includes(c.type) || (c.parentId && !state.categories.some(p => p.id === c.parentId && p.type === c.type)))) throw new Error('Некоректні категорії.');
+    if (state.transactions.some(t => !['income','expense','transfer'].includes(t.type) || !Number.isSafeInteger(t.amountKopecks) || t.amountKopecks <= 0 || !validDate(t.date) || typeof t.title !== 'string' || !t.title.trim() || !state.accounts.some(a => a.id === t.accountId) || (t.type === 'transfer' ? (!state.accounts.some(a => a.id === t.toAccountId && a.id !== t.accountId) || !Number.isSafeInteger(t.toAmountKopecks) || t.toAmountKopecks<=0 || (state.accounts.find(a=>a.id===t.accountId).currency===state.accounts.find(a=>a.id===t.toAccountId).currency && t.toAmountKopecks!==t.amountKopecks)) : !state.categories.some(c => c.id === t.categoryId && c.type === t.type)) || !Array.isArray(t.tags))) throw new Error('Некоректні транзакції.');
+    if (state.transactions.some(t => t.paymentMethod != null && !PAYMENT_METHODS.some(m => m.id === t.paymentMethod))) throw new Error('Некоректний спосіб оплати у транзакції.');
+    if (state.budgets.some(b => !CURRENCIES.includes(b.currency) || !Number.isSafeInteger(b.limitKopecks) || b.limitKopecks <= 0 || !validDate(b.start) || !validDate(b.end) || b.start > b.end || (b.categoryId && !state.categories.some(c => c.id === b.categoryId)))) throw new Error('Некоректні бюджети.');
+    if (state.goals.some(g => !CURRENCIES.includes(g.currency) || typeof g.name !== 'string' || !g.name.trim() || !Number.isSafeInteger(g.targetKopecks) || g.targetKopecks <= 0 || !Number.isSafeInteger(g.currentKopecks) || g.currentKopecks < 0)) throw new Error('Некоректні цілі.');
+    if (state.schedules.some(s => !['income','expense'].includes(s.type) || !['daily','weekly','monthly'].includes(s.recurrence) || !validDate(s.nextDate) || !Number.isSafeInteger(s.amountKopecks) || s.amountKopecks <= 0 || !state.accounts.some(a => a.id === s.accountId) || !state.categories.some(c => c.id === s.categoryId && c.type === s.type))) throw new Error('Некоректні заплановані операції.');
+    if (state.schedules.some(s => s.paymentMethod != null && !PAYMENT_METHODS.some(m => m.id === s.paymentMethod))) throw new Error('Некоректний спосіб розрахунку у запланованій операції.');
+    if (state.rules.some(r => typeof r.needle !== 'string' || !r.needle.trim() || !state.categories.some(c => c.id === r.categoryId))) throw new Error('Некоректні правила.');
+    return state;
   }
 
   function accountBalance(state, accountId) {
@@ -172,7 +183,7 @@
       if (t.type === 'income' && t.accountId === accountId) return balance + t.amountKopecks;
       if (t.type === 'expense' && t.accountId === accountId) return balance - t.amountKopecks;
       if (t.type === 'transfer' && t.accountId === accountId) return balance - t.amountKopecks;
-      if (t.type === 'transfer' && t.toAccountId === accountId) return balance + t.amountKopecks;
+      if (t.type === 'transfer' && t.toAccountId === accountId) return balance + (t.toAmountKopecks ?? t.amountKopecks);
       return balance;
     }, account.openingKopecks);
   }
@@ -186,6 +197,18 @@
     }
     totals.net = totals.income - totals.expense;
     return totals;
+  }
+
+  function totalsByCurrency(state,start,end) {
+    const result=Object.fromEntries(CURRENCIES.map(currency=>[currency,{income:0,expense:0,net:0}]));
+    const accounts=new Map(state.accounts.map(a=>[a.id,a]));
+    for(const t of state.transactions) {
+      if(t.date<start || t.date>end || t.type==='transfer') continue;
+      const currency=accounts.get(t.accountId)?.currency || 'UAH';
+      result[currency][t.type]+=t.amountKopecks;
+    }
+    for(const totals of Object.values(result)) totals.net=totals.income-totals.expense;
+    return result;
   }
 
   function filterTransactions(rows, filters = {}, categories = []) {
@@ -207,8 +230,8 @@
     }
     return false;
   }
-  function budgetSpent(budget, rows, categories=[]) {
-    return rows.reduce((sum, t) => sum + (t.type === 'expense' && t.date >= budget.start && t.date <= budget.end && (!budget.categoryId || isCategoryWithin(t.categoryId,budget.categoryId,categories)) ? t.amountKopecks : 0), 0);
+  function budgetSpent(budget, rows, categories=[], accounts=[]) {
+    return rows.reduce((sum, t) => sum + (t.type === 'expense' && t.date >= budget.start && t.date <= budget.end && (!budget.categoryId || isCategoryWithin(t.categoryId,budget.categoryId,categories)) && ((accounts.find(a=>a.id===t.accountId)?.currency || 'UAH')===(budget.currency || 'UAH')) ? t.amountKopecks : 0), 0);
   }
 
   function advanceDate(date, recurrence, anchorDay) {
@@ -242,7 +265,7 @@
     return rows;
   }
 
-  function transactionFingerprint(t) { return [t.date,t.type,t.accountId,t.toAccountId||'',t.amountKopecks,String(t.title).trim().toLocaleLowerCase('uk')].join('|'); }
+  function transactionFingerprint(t) { return [t.date,t.type,t.accountId,t.toAccountId||'',t.amountKopecks,t.type==='transfer'?(t.toAmountKopecks??t.amountKopecks):'',String(t.title).trim().toLocaleLowerCase('uk')].join('|'); }
   function categoryUrl(id) { return `category.html?id=${encodeURIComponent(id)}`; }
   function mapCsvTransactions(rows, map, state) {
     const existing=new Set(state.transactions.map(transactionFingerprint)), pending=[], problems=[];
@@ -252,12 +275,16 @@
       const rawType=get('type').toLocaleLowerCase('uk');
       const type=rawType==='дохід'||rawType==='income'?'income':rawType==='переказ'||rawType==='transfer'?'transfer':rawType===''||rawType==='витрата'||rawType==='expense'?'expense':null;
       const accountRaw=get('account'),categoryRaw=get('category'),destinationRaw=get('destination'),paymentRaw=get('paymentMethod').toLocaleLowerCase('uk');
-      const account=accountRaw?state.accounts.find(a=>a.name.toLocaleLowerCase('uk')===accountRaw.toLocaleLowerCase('uk')):state.accounts.find(a=>!a.archived);
-      const destination=type==='transfer'?state.accounts.find(a=>a.name.toLocaleLowerCase('uk')===destinationRaw.toLocaleLowerCase('uk')):null;
+      const currency=(get('currency')||'UAH').toUpperCase(), destinationCurrency=(get('destinationCurrency')||'UAH').toUpperCase();
+      const account=accountRaw?state.accounts.find(a=>a.name.toLocaleLowerCase('uk')===accountRaw.toLocaleLowerCase('uk') && (a.currency||'UAH')===currency):state.accounts.find(a=>!a.archived && (a.currency||'UAH')===currency);
+      const destination=type==='transfer'?state.accounts.find(a=>a.name.toLocaleLowerCase('uk')===destinationRaw.toLocaleLowerCase('uk') && (a.currency||'UAH')===destinationCurrency):null;
       const category=type&&type!=='transfer'?(categoryRaw?state.categories.find(c=>c.type===type&&c.name.toLocaleLowerCase('uk')===categoryRaw.toLocaleLowerCase('uk')):state.categories.find(c=>c.type===type)):null;
       const paymentMethod=paymentRaw ? PAYMENT_METHODS.find(m=>m.id===paymentRaw||m.name.toLocaleLowerCase('uk')===paymentRaw)?.id : null;
-      if(!title||!amountKopecks||!validDate(date)||!type||!account||(type==='transfer'?(!destination||destination.id===account.id):!category)||(paymentRaw&&!paymentMethod)){problems.push(index+2);return;}
-      const item={title,type,amountKopecks,date,accountId:account.id,toAccountId:destination?.id||null,categoryId:category?.id||null,paymentMethod,note:get('note'),tags:get('tags').split(/[;,]/).map(s=>s.trim()).filter(Boolean)};
+      const cross=type==='transfer' && account && destination && (account.currency||'UAH')!==(destination.currency||'UAH');
+      const received=get('toAmount')?parseMoney(get('toAmount')):null;
+      const toAmountKopecks=type==='transfer'?(cross?received:amountKopecks):null;
+      if(!title||!amountKopecks||!validDate(date)||!type||!CURRENCIES.includes(currency)||!account||(type==='transfer'?(!destination||destination.id===account.id||!toAmountKopecks||(received&&!cross&&received!==amountKopecks)):!category)||(paymentRaw&&!paymentMethod)){problems.push(index+2);return;}
+      const item={title,type,amountKopecks,toAmountKopecks,date,accountId:account.id,toAccountId:destination?.id||null,categoryId:category?.id||null,paymentMethod,note:get('note'),tags:get('tags').split(/[;,]/).map(s=>s.trim()).filter(Boolean)};
       const fingerprint=transactionFingerprint(item);
       if(existing.has(fingerprint)){problems.push(index+2);return;}
       existing.add(fingerprint);pending.push(item);
@@ -267,7 +294,6 @@
   function csvCell(value) { let s=String(value??''); if (/^[\s]*[=+\-@]/.test(s)) s=`'${s}`; return /[",\n\r;]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s; }
   function toCSV(rows) { return rows.map(row=>row.map(csvCell).join(',')).join('\r\n')+'\r\n'; }
 
-  return { VERSION, DEFAULT_CATEGORIES, PAYMENT_METHODS, emptyState, upgradeStarterCategories, parseMoney, parseNonnegativeMoney, validDate, migrateLegacy, addSampleExpenses, ensureSampleExpensesOnce, validateBackup,
-    accountBalance, periodTotals, filterTransactions, isCategoryWithin, budgetSpent, advanceDate, parseCSV, transactionFingerprint, categoryUrl, mapCsvTransactions, toCSV };
+  return { VERSION, CURRENCIES, ACCOUNT_TYPES, DEFAULT_CATEGORIES, PAYMENT_METHODS, emptyState, upgradeStarterCategories, parseMoney, parseNonnegativeMoney, validDate, migrateLegacy, addSampleExpenses, ensureSampleExpensesOnce, validateBackup,
+    accountBalance, periodTotals, totalsByCurrency, filterTransactions, isCategoryWithin, budgetSpent, advanceDate, parseCSV, transactionFingerprint, categoryUrl, mapCsvTransactions, toCSV };
 });
-
