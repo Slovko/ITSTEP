@@ -211,6 +211,17 @@
     return result;
   }
 
+  function allTimeExpenseTotals(state) {
+    const totals=Object.fromEntries(CURRENCIES.map(currency=>[currency,0]));
+    const accounts=new Map(state.accounts.map(account=>[account.id,account]));
+    for(const transaction of state.transactions) {
+      if(transaction.type!=='expense') continue;
+      const currency=accounts.get(transaction.accountId)?.currency || 'UAH';
+      totals[currency]+=transaction.amountKopecks;
+    }
+    return totals;
+  }
+
   function filterTransactions(rows, filters = {}, categories = []) {
     const query = String(filters.query || '').trim().toLocaleLowerCase('uk');
     const tag = String(filters.tag || '').trim().toLocaleLowerCase('uk');
@@ -295,5 +306,5 @@
   function toCSV(rows) { return rows.map(row=>row.map(csvCell).join(',')).join('\r\n')+'\r\n'; }
 
   return { VERSION, CURRENCIES, ACCOUNT_TYPES, DEFAULT_CATEGORIES, PAYMENT_METHODS, emptyState, upgradeStarterCategories, parseMoney, parseNonnegativeMoney, validDate, migrateLegacy, addSampleExpenses, ensureSampleExpensesOnce, validateBackup,
-    accountBalance, periodTotals, totalsByCurrency, filterTransactions, isCategoryWithin, budgetSpent, advanceDate, parseCSV, transactionFingerprint, categoryUrl, mapCsvTransactions, toCSV };
+    accountBalance, periodTotals, totalsByCurrency, allTimeExpenseTotals, filterTransactions, isCategoryWithin, budgetSpent, advanceDate, parseCSV, transactionFingerprint, categoryUrl, mapCsvTransactions, toCSV };
 });
